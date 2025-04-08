@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Typescript agent specific ignores
+node_modules/

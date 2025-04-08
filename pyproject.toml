@@ -1,0 +1,10 @@
+[project]
+name = "freat"
+version = "0.1.0"
+description = "The frida-powered, cross-platform highly opinionated reverse engineering toolkit."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "frida>=16.7.7",
+    "websockets>=15.0.1",
+]

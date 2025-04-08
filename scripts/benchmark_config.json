@@ -1,0 +1,10 @@
+{
+    "pid": 37141,
+    "scan_value": 28,
+    "iterations": 50,
+    "host": "127.0.0.1",
+    "port": 8888,
+    "scan_width": 4,
+    "scan_signed": false,
+    "page_size": 100
+} 

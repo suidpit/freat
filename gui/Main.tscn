@@ -1,0 +1,184 @@
+[gd_scene load_steps=7 format=3 uid="uid://kl85ax68s5hg"]
+
+[ext_resource type="Texture2D" uid="uid://cnijsghbjiifw" path="res://icon.svg" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://dcepudim6x7pb" path="res://scripts/ui_control.gd" id="1_uu6xs"]
+[ext_resource type="PackedScene" uid="uid://cwgu3j1pf6k22" path="res://ProcessList.tscn" id="3_r0du0"]
+
+[sub_resource type="SystemFont" id="SystemFont_rxg2q"]
+font_names = PackedStringArray("Iosevka")
+
+[sub_resource type="LabelSettings" id="LabelSettings_rxg2q"]
+font = SubResource("SystemFont_rxg2q")
+font_size = 100
+outline_size = 4
+outline_color = Color(0.0253638, 0.0253638, 0.0253638, 1)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glv2v"]
+bg_color = Color(0, 0, 0, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.955661, 0.768283, 0.439891, 1)
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="UI" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_uu6xs")
+
+[node name="SplashScreen" type="CenterContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/SplashScreen"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 20
+
+[node name="Label" type="Label" parent="UI/SplashScreen/VBoxContainer"]
+layout_mode = 2
+text = "FREAT"
+label_settings = SubResource("LabelSettings_rxg2q")
+horizontal_alignment = 1
+
+[node name="AttachButton" type="Button" parent="UI/SplashScreen/VBoxContainer"]
+layout_mode = 2
+text = "ATTACH NOW"
+icon = ExtResource("1_glv2v")
+
+[node name="MainUI" type="HSplitContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+split_offset = 250
+
+[node name="PanelContainer" type="PanelContainer" parent="UI/MainUI"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_glv2v")
+
+[node name="Left" type="MarginContainer" parent="UI/MainUI/PanelContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/MainUI/PanelContainer/Left"]
+layout_mode = 2
+
+[node name="AddressListLabel" type="Label" parent="UI/MainUI/PanelContainer/Left/VBoxContainer"]
+layout_mode = 2
+text = "Address List"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/MainUI/PanelContainer/Left/VBoxContainer"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/MainUI/PanelContainer/Left/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemList" type="ItemList" parent="UI/MainUI/PanelContainer/Left/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PanelContainer2" type="PanelContainer" parent="UI/MainUI"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Right" type="MarginContainer" parent="UI/MainUI/PanelContainer2"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/MainUI/PanelContainer2/Right"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+text = "ScanControls"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Value:"
+
+[node name="ScanValue" type="LineEdit" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Enter Value..."
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+text = "Type:"
+
+[node name="OptionButton" type="OptionButton" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+selected = 0
+item_count = 1
+popup/item_0/text = "Exact Scan"
+popup/item_0/id = 0
+
+[node name="FirstScanButton" type="Button" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+text = "First Scan"
+
+[node name="NextScanButton" type="Button" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+disabled = true
+text = "Next Scan"
+
+[node name="DetachButton" type="Button" parent="UI/MainUI/PanelContainer2/Right/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 10
+text = "Detach"
+
+[node name="ProcessList" parent="UI" instance=ExtResource("3_r0du0")]
+visible = false
+
+[node name="PollScanResultsTimer" type="Timer" parent="UI"]
+wait_time = 0.05
+autostart = true
+
+[connection signal="pressed" from="UI/SplashScreen/VBoxContainer/AttachButton" to="UI" method="_on_attach_button_pressed"]
+[connection signal="pressed" from="UI/MainUI/PanelContainer2/Right/VBoxContainer/FirstScanButton" to="UI" method="_on_first_scan_button_pressed"]
+[connection signal="pressed" from="UI/MainUI/PanelContainer2/Right/VBoxContainer/NextScanButton" to="UI" method="_on_next_scan_button_pressed"]
+[connection signal="pressed" from="UI/MainUI/PanelContainer2/Right/VBoxContainer/DetachButton" to="UI" method="_on_detach_button_pressed"]
+[connection signal="timeout" from="UI/PollScanResultsTimer" to="UI" method="_on_poll_scan_results_timer_timeout"]
