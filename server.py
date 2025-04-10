@@ -23,6 +23,7 @@ class CommandType(Enum):
     GET_MEMORY_MAPS = "get_memory_maps"
     GET_SCAN_RESULTS = "get_scan_results"
     GET_PROCESSES = "get_processes"
+    WRITE_MEMORY = "write_memory"
 
 class FreatServer:
     def __init__(self, host="127.0.0.1", port=8888):
@@ -101,6 +102,8 @@ class FreatServer:
                 await self.handle_get_scan_results(websocket, client_id, data)
             elif command == CommandType.GET_PROCESSES.value:
                 await self.handle_get_processes(websocket, client_id, command)
+            elif command == CommandType.WRITE_MEMORY.value:
+                await self.handle_write_memory(websocket, client_id, data)
             else:
                 await websocket.send(json.dumps({
                     "status": "error",
@@ -391,6 +394,42 @@ class FreatServer:
                 "error": str(e),
                 "command": command
             }))
+
+    async def handle_write_memory(self, websocket, client_id, data):
+        """Write memory at a specific address"""
+        command = data["command"]
+        
+        if client_id not in self.scripts:
+            await websocket.send(json.dumps({
+                "status": "error",
+                "error": "Not attached to any process",
+                "command": command
+            }))
+            return
+        
+        address = data["address"]
+        value = data["value"]
+        width = data.get("width", 4)
+        signed = data.get("signed", False)
+        
+        try:
+            script = self.scripts[client_id]
+            script.exports.write(address, value, width, signed)
+            
+            await websocket.send(json.dumps({
+                "status": "success",
+                "message": "Memory written successfully",
+                "command": command
+            }))
+        except Exception as e:
+            logger.error(f"Error writing memory: {str(e)}")
+            await websocket.send(json.dumps({
+                "status": "error",
+                "error": str(e),
+                "command": command
+            }))
+        
+
 
 
 async def main():

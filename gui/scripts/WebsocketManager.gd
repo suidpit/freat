@@ -7,6 +7,7 @@ signal connection_status_changed(is_connected: bool)
 signal processes_received(processes: Array)
 signal attach_confirmed(data: Dictionary)
 signal attach_failed(error_data: Dictionary)
+signal memory_write(data: Dictionary)
 
 signal scan_metadata_received(metadata: Dictionary)
 signal scan_results_received(results: Dictionary)
@@ -80,6 +81,9 @@ func _process_message(data: Dictionary) -> void:
 			"read_memory":
 				if data["status"] == "success":
 					emit_signal("memory_read", data)
+			"write_memory":
+				if data["status"] == "success":
+					emit_signal("memory_write", data)
 			"get_processes":
 				if data["status"] == "success":
 					emit_signal("processes_received", data.get("result", []))

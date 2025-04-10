@@ -4,13 +4,17 @@ extends Panel
 @onready var splash_screen: CenterContainer = $SplashScreen
 @onready var main_ui: HSplitContainer = $MainUI
 
-@onready var process_list: PopupPanel = $ProcessList
+@onready var process_list: PopupPanel = $"ProcessList"
+@onready var write_dialog: PopupPanel = $WriteDialog
+@onready var found_address_context_menu: PopupMenu = $FoundAddressContextMenu
 @onready var scan_value: LineEdit = $MainUI/PanelContainer2/Right/VBoxContainer/HBoxContainer/ScanValue
 @onready var next_scan_button: Button = $MainUI/PanelContainer2/Right/VBoxContainer/NextScanButton
 @onready var address_list_label: Label = $MainUI/PanelContainer/Left/VBoxContainer/AddressListLabel
 @onready var detach_button: Button = $MainUI/PanelContainer2/Right/VBoxContainer/DetachButton
+@onready var address_write_value: LineEdit = $WriteDialog/MarginContainer/VBoxContainer/AddressWriteValue
 
 var current_scan_addresses_number: int = 0
+var right_clicked_found_address_index: int = -1
 
 func _ready() -> void:
 	# Ensure only the initial view is visible at the start
@@ -23,7 +27,6 @@ func _ready() -> void:
 	WebsocketManager.attach_confirmed.connect(self._on_websocket_attach_confirmed)
 	WebsocketManager.scan_metadata_received.connect(self._on_websocket_scan_metadata_received)
 	WebsocketManager.scan_results_received.connect(self._on_websocket_scan_results_received)
-	
 
 func _on_attach_button_pressed() -> void:
 	print("Attach button pressed. Requesting process list...")
@@ -35,7 +38,8 @@ func _on_websocket_process_received(processes: Array) -> void:
 	print("Received process list from websocket")
 	process_list.populate_process_list(processes)
 	print("Process list populated. Popupping...")
-	process_list.popup_centered()
+	# Get the parent size and position the popup on the right
+	process_list.popup()
 
 func _on_process_selected(process_info: Dictionary) -> void:
 	print("Process selected: ", process_info)
@@ -95,8 +99,9 @@ func _on_websocket_scan_results_received(results: Dictionary) -> void:
 		item_list.clear()
 		
 		for item in scan_data["results"]:
-			var text = "Address: %s, Value: %s" % [item["address"], item["value"]]
-			item_list.add_item(text)
+			var text = "Address: %s \t Value: %s" % [item["address"], item["value"]]
+			var index = item_list.add_item(text)
+			item_list.set_item_metadata(index, item["address"])
 
 
 func _on_detach_button_pressed() -> void:
@@ -115,3 +120,36 @@ func _on_poll_scan_results_timer_timeout() -> void:
 			"page": 1,
 			"page_size": 100
 		})
+
+
+func _on_item_list_item_clicked(index: int, _at_position: Vector2, mouse_button_index: int) -> void:
+	if mouse_button_index == MOUSE_BUTTON_RIGHT:
+		right_clicked_found_address_index = index
+		found_address_context_menu.position = get_global_mouse_position()
+		found_address_context_menu.popup()
+
+
+func _on_ok_button_pressed() -> void:
+	var value = address_write_value.text
+	if !value.is_valid_int():
+		print("Invalid value: ", value)
+		return
+	var address = item_list.get_item_metadata(right_clicked_found_address_index)
+	if address == null:
+		print("No address found for selected item")
+		return
+	write_dialog.hide()
+	WebsocketManager.send_message({
+		"command": "write_memory",
+		"address": address,
+		"value": int(value),
+		"width": 4,
+		"signed": false
+	})
+
+
+
+func _on_found_address_context_menu_id_pressed(id: int) -> void:
+	match id:
+		0:
+			write_dialog.popup_centered()
