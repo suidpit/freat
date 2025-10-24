@@ -39,5 +39,12 @@ async def test_hello(target_process: subprocess.Popen, mocker: MockFixture):
     mock_websocket = mocker.AsyncMock()
     hub = Hub()
     await hub.attach(target_process.pid)
-    await hub.handle_message(mock_websocket, json.dumps({"command": "hello"}))
-    mock_websocket.send.assert_awaited_once_with(json.dumps({"event": "hello", "data": "hello from the agent!"}))
+    await hub.handle_message(mock_websocket, json.dumps({"command": "hello", "uuid": "1234567890"}))
+    mock_websocket.send.assert_awaited_once_with(json.dumps({"event": "hello", "data": "hello from the agent!", "uuid": "1234567890"}))
+
+@pytest.mark.asyncio
+async def test_hello_not_attached(target_process: subprocess.Popen, mocker: MockFixture):
+    mock_websocket = mocker.AsyncMock()
+    hub = Hub()
+    await hub.handle_message(mock_websocket, json.dumps({"command": "hello", "uuid": "1234567890"}))
+    mock_websocket.send.assert_awaited_once_with(json.dumps({"event": "error", "data": "Agent is not initialized", "uuid": "1234567890"}))

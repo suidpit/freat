@@ -25,6 +25,8 @@ class Hub:
     def __init__(self, user_config: dict = {}):
         self.session = None
         self.agent: Agent | None = None
+        # TODO: implement support for other devices
+        self.device = frida.get_local_device()
         self.clients = set()
         self.watch_list = {}
         self.freeze_list = {}
@@ -142,20 +144,26 @@ class Hub:
             msg = json.loads(message_str)
             command = msg.get("command")
             params = msg.get("params", {})
+            request_uuid = msg.get("uuid")
 
             if command == "attach":
                 self.attach(params["pid"])
             else:
-                assert self.agent is not None, "Agent is not initialized"
+                if self.agent is None:
+                    raise AssertionError("Agent is not initialized")
                 match command:
-                    case "attach":
-                        self.attach(params["pid"])
                     case "hello":
                         response = await self.agent.hello()
-                        await websocket.send(json.dumps({"event": "hello", "data": response}))
+                        to_send = {"event": "hello", "data": response}
+                    case "get-processes":
+                        response = [{"pid": pid, "name": name} for pid, name in self.device.enumerate_processes()]
+                        to_send = {"event": "get-processes", "data": response}
                     case _:
                         print(f"Unknown command: {command}")
-
         except Exception as e:
             print(f"Failed to handle message: {e}")
-            await websocket.send(json.dumps({"event": "error", "data": str(e)}))
+            to_send = {"event": "error", "data": str(e)}
+        finally:
+            if to_send:
+                to_send["uuid"] = request_uuid
+                await websocket.send(json.dumps(to_send))
