@@ -1,0 +1,31 @@
+[project]
+name = "freat-server"
+version = "0.1.0"
+description = "Python backend for freat."
+readme = "README.md"
+authors = [
+    { name = "suidpit", email = "pit95@pm.me" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "frida>=17.4.0",
+    "platformdirs>=4.5.0",
+    "websockets>=15.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.14.2",
+    "watchfiles>=1.1.1",
+]
+
+
+[project.scripts]
+freat-server = "freat_server.server:main"
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"
