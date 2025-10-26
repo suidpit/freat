@@ -10,7 +10,8 @@ import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const cModulePath = path.resolve(__dirname, "agent/scanner.c");
+const cModulePath = path.resolve(__dirname, "native/scanner.c");
+const cLogModulePath = path.resolve(__dirname, "native/log.c");
 const outputAgentPath = path.resolve(
   __dirname,
   "../src/freat_server/_agent.js",
@@ -24,22 +25,21 @@ export default {
     format: "iife",
   },
   plugins: [
+    replace({
+      preventAssignment: true,
+      delimiters: ['"', '"'],
+      values: {
+        __C_MODULE_PLACEHOLDER__: JSON.stringify(
+          fs.readFileSync(cModulePath, "utf8") +
+            fs.readFileSync(cLogModulePath, "utf8"),
+        ),
+      },
+    }),
     nodeResolve({
       preferBuiltins: false,
     }),
     commonjs(),
     typescript(),
-    replace({
-      preventAssignment: true,
-      values: {
-        __C_MODULE_PLACEHOLDER__: () => {
-          console.log(`Injecting C module from ${cModulePath}...`);
-          const cCode = fs.readFileSync(cModulePath, "utf8");
-          return JSON.stringify(cCode);
-        },
-      },
-    }),
-
     terser({
       output: { comments: false },
       compress: {

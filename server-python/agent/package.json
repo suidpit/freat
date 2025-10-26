@@ -6,10 +6,8 @@
   "main": "agent/index.ts",
   "type": "module",
   "scripts": {
-    "build": "frida-compile agent/index.ts -o ../src/freat_server/_agent.js -c",
-    "watch": "frida-compile agent/index.ts -o ../src/freat_server/_agent.js -w",
-    "build-rollup": "rollup -c",
-    "watch-rollup": "nodemon --watch agent/ -e ts,c --exec \"npm run build-rollup\""
+    "build": "rollup -c",
+    "watch": "nodemon --watch agent/ --watch native/ -e ts,c --exec \"npm run build\""
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.9",

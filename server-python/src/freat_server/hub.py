@@ -3,17 +3,32 @@ import json
 
 import frida
 from importlib import resources
+from enum import Enum
 
 from frida.core import Script, ScriptExportsAsync
 from typing import Any, Awaitable, Protocol
+
+class ScanSize(Enum):
+    U8 = 0
+    U16 = 1
+    U32 = 2
+    U64 = 3
+    FLOAT = 4
+    DOUBLE = 5
+
+class ScanType(Enum):
+    EXACT = 0
+    LESS_THAN = 1
+    GREATER_THAN = 2
 
 class Agent(Protocol):
     """
     Defines the interface for the Frida agent script.
     """
     def hello(self) -> Awaitable[Any]: ...
-    def read_batch(self, dict) -> Awaitable[Any]: ...
-    def write_batch(self, dict) -> Awaitable[Any]: ...
+    def scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
+    def setup_scan_test(self, secret: int) -> Awaitable[str]: ...
+    def clean_scan_test(self) -> Awaitable[None]: ...
 
 
 class Hub:
@@ -33,6 +48,7 @@ class Hub:
         self.polling_task: asyncio.Task | None = None
         self.user_config = user_config
         self.agent_js = self._load_agent_script()
+        self.loop = asyncio.get_event_loop()
 
     def _load_agent_script(self) -> str:
         print("Loading agent script...")
@@ -78,13 +94,13 @@ class Hub:
 
             self.session = frida.attach(pid)
             self.session.on(
-                "detached", lambda reason: asyncio.run(self.detach())
+                "detached", lambda reason: self.detach_sync(reason)
             )
 
             script = self.session.create_script(self.agent_js)
+            script.on("message", lambda message, data: print(message, data))
             script.load()
             self.agent = script.exports_async
-
             self.polling_task = asyncio.create_task(self._poll_loop())
             await self.broadcast({"event": "status", "data": f"Attached to {pid}"})
             print(f"Attached to {pid}.")
@@ -93,10 +109,17 @@ class Hub:
             await self.broadcast(
                 {"event": "error", "data": f"Error attaching to {pid}: {e}"}
             )
+    def detach_sync(self, reason):
+        if not self.loop.is_closed():
+            self.loop.create_task(self.detach(reason))
 
-    async def detach(self):
+
+    async def detach(self, reason = None):
         """Detaches from the current process."""
-
+        if reason:
+            print(f"Detaching due to {reason}")
+        else:
+            print("Detaching.")
         if self.polling_task:
             self.polling_task.cancel()
             self.polling_task = None
@@ -107,7 +130,7 @@ class Hub:
         self.session = None
         self.agent = None
         await self.broadcast({"event": "status", "data": "Detached"})
-        print("Detached.")
+
 
     async def _poll_loop(self):
         """
@@ -122,14 +145,6 @@ class Hub:
                     print("Pool loop: no agent. Breaking.")
                     break
 
-                if watch_job:
-                    read_values = await self.agent.read_batch(watch_job)
-                    await self.broadcast({"event": "table_update", "data": read_values})
-
-                if freeze_job:
-                    await self.agent.write_batch(freeze_job)
-
-                # TODO put this in config
                 await asyncio.sleep(0.1)
             except frida.InvalidOperationError:
                 print("Polling failed. Breaking")
