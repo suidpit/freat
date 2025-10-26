@@ -34,6 +34,7 @@ static GArray * fn_name( \
             return NULL; \
         } \
         type value_to_scan = *(type *)value_ptr; \
+        log("Value to scan: %llu", value_to_scan); \
         const guint step = alignment; \
         uintptr_t end_addr = base_addr + region_size; \
         for (uintptr_t p = base_addr; p <= end_addr - step; p += step) { \
@@ -78,8 +79,6 @@ uintptr_t * scan_region(
     void *value_ptr,
     gsize *out_count) {
         GArray *results_array = NULL;
-        log("Scanning region at 0x%lx with size %zu bytes, scan type %d, scan size %d", base_addr, region_size, scan_type, scan_size);
-
         switch (scan_size) {
             case U8:
                 results_array = scan_helper_u8(base_addr, region_size, value_ptr, scan_type);
@@ -108,6 +107,97 @@ uintptr_t * scan_region(
         return (uintptr_t *)g_array_free(results_array, FALSE);
     }
 
-void free_scan_results(uintptr_t *results_ptr) {
+#define DEFINE_FILTER_HELPER(fn_name, type) \
+static GArray * fn_name( \
+    uintptr_t * prev_results, \
+    gsize prev_count, \
+    void *value_ptr, \
+    ScanType scan_type) { \
+        log("(%s) Filtering %s at %p (#%zu elements)", #fn_name, #type, prev_results, prev_count); \
+        GArray *new_results = g_array_new(FALSE, FALSE, sizeof(uintptr_t)); \
+        if (new_results == NULL) { \
+            return NULL; \
+        } \
+        type value_to_scan = *(type *)value_ptr; \
+        log("Value to scan: %llu", value_to_scan); \
+        for (guint i = 0; i < prev_count; i++) { \
+            uintptr_t p = prev_results[i]; \
+            type value_at_addr = *(type *)(p); \
+            gboolean match = FALSE; \
+            switch (scan_type) { \
+                case EXACT: \
+                    if (value_at_addr == value_to_scan) { \
+                        match = TRUE; \
+                    } \
+                    break; \
+                case LESS_THAN: \
+                    if (value_at_addr < value_to_scan) { \
+                        match = TRUE; \
+                    } \
+                    break; \
+                case GREATER_THAN: \
+                    if (value_at_addr > value_to_scan) { \
+                        match = TRUE; \
+                    } \
+                    break; \
+            } \
+            if (match) { \
+                g_array_append_val(new_results, p); \
+            } \
+        } \
+        return new_results; \
+    }
+
+DEFINE_FILTER_HELPER(filter_helper_u8, guint8)
+DEFINE_FILTER_HELPER(filter_helper_u16, guint16)
+DEFINE_FILTER_HELPER(filter_helper_u32, guint32)
+DEFINE_FILTER_HELPER(filter_helper_u64, guint64)
+DEFINE_FILTER_HELPER(filter_helper_float, gfloat)
+DEFINE_FILTER_HELPER(filter_helper_double, gdouble)
+
+uintptr_t * filter_scans(
+    uintptr_t * prev_results,
+    gsize prev_count,
+    ScanType scan_type,
+    ScanSize scan_size,
+    uintptr_t * value_ptr,
+    uintptr_t * out_count
+) {
+    GArray *new_results = NULL;
+    switch (scan_size) {
+        case U8:
+            new_results = filter_helper_u8(prev_results, prev_count, value_ptr, scan_type);
+            break;
+        case U16:
+            new_results = filter_helper_u16(prev_results, prev_count, value_ptr, scan_type);
+            break;
+        case U32:
+            new_results = filter_helper_u32(prev_results, prev_count, value_ptr, scan_type);
+            break;
+        case U64:
+            new_results = filter_helper_u64(prev_results, prev_count, value_ptr, scan_type);
+            break;
+        case FLOAT:
+            new_results = filter_helper_float(prev_results, prev_count, value_ptr, scan_type);
+            break;
+        case DOUBLE:
+            new_results = filter_helper_double(prev_results, prev_count, value_ptr, scan_type);
+            break;
+    }
+
+    *out_count = new_results->len;
+    return (uintptr_t *)g_array_free(new_results, FALSE);
+}
+
+gboolean find_address_in_results(uintptr_t * results, gsize count, uintptr_t addr) {
+    for (gsize i = 0; i < count; i++) {
+        if (results[i] == addr) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void free_results(uintptr_t *results_ptr) {
     g_free(results_ptr);
 }

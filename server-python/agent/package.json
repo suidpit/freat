@@ -10,6 +10,7 @@
     "watch": "nodemon --watch agent/ --watch native/ -e ts,c --exec \"npm run build\""
   },
   "devDependencies": {
+    "@frida/rollup-plugin-node-polyfills": "^4.0.1",
     "@rollup/plugin-commonjs": "^28.0.9",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-replace": "^6.0.2",
