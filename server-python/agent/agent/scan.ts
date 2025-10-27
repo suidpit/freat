@@ -102,17 +102,19 @@ export function firstScan(
   scanType: ScanType,
 ): number {
   log(`firstScan(${value}, ${scanSize}, ${scanType})`);
-
+  currentScanResults = [];
   const ranges = Process.enumerateRanges("rw-").concat(
     Process.enumerateMallocRanges(),
   );
+  _writeValue(value, scanSize);
+  log(`value written at ${valuePtr}: ${valuePtr.readU32()}`);
   for (const range of ranges) {
     const resultsPtr = scan_region(
       range.base,
       range.size,
       scanType,
       scanSize,
-      _writeValue(value, scanSize),
+      valuePtr,
       outCountPtr,
     );
 
@@ -163,6 +165,12 @@ export function runScanTest(): boolean {
   const secret = new UInt64("0xdeadbeefcafebabe");
   const range = Process.enumerateRanges("rw-")[0];
   range.base.writeU64(secret);
+
+  firstScan(0xcafebabe, ScanSize.U32, ScanType.EXACT);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Scan failed: expected U32 result not found in first scan");
+    return false;
+  }
   firstScan(secret, ScanSize.U64, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
     console.error("Scan failed: expected result not found in first scan");

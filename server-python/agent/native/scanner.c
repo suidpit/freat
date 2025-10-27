@@ -34,7 +34,6 @@ static GArray * fn_name( \
             return NULL; \
         } \
         type value_to_scan = *(type *)value_ptr; \
-        log("Value to scan: %llu", value_to_scan); \
         const guint step = alignment; \
         uintptr_t end_addr = base_addr + region_size; \
         for (uintptr_t p = base_addr; p <= end_addr - step; p += step) { \
@@ -119,7 +118,6 @@ static GArray * fn_name( \
             return NULL; \
         } \
         type value_to_scan = *(type *)value_ptr; \
-        log("Value to scan: %llu", value_to_scan); \
         for (guint i = 0; i < prev_count; i++) { \
             uintptr_t p = prev_results[i]; \
             type value_at_addr = *(type *)(p); \
