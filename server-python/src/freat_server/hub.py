@@ -28,6 +28,7 @@ class Agent(Protocol):
     def hello(self) -> Awaitable[Any]: ...
     def first_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def next_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
+    def get_scan_results(self, count: int) -> Awaitable[list[int]]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
 
 class Hub:
@@ -178,6 +179,9 @@ class Hub:
                     case "next-scan":
                         response = await self.agent.next_scan(params["value"], params["scan_size"], params["scan_type"])
                         to_send = {"event": "next-scan", "data": response}
+                    case "get-scan-results":
+                        response = await self.agent.get_scan_results(params["count"])
+                        to_send = {"event": "get-scan-results", "data": response}
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:

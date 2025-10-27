@@ -161,6 +161,26 @@ export function nextScan(
   return getCount();
 }
 
+export function getScanResults(maxResults: number = 100): number[] {
+  const results = [];
+  let addedResults = 0;
+  for (const { ptr, count } of currentScanResults) {
+    for (let i = 0; i < count; i++) {
+      results.push(
+        ptr
+          .add(i * Process.pointerSize)
+          .readPointer()
+          .toUInt32(),
+      );
+      addedResults++;
+      if (addedResults >= maxResults) {
+        return results;
+      }
+    }
+  }
+  return results;
+}
+
 export function runScanTest(): boolean {
   const secret = new UInt64("0xdeadbeefcafebabe");
   const range = Process.enumerateRanges("rw-")[0];
@@ -186,6 +206,11 @@ export function runScanTest(): boolean {
   }
   if (checkAddrInResults(range.base.add(8))) {
     console.error("Scan failed: unexpected address found in next scan");
+    return false;
+  }
+  const scanResults = getScanResults();
+  if (range.base.toUInt32() != scanResults[0]) {
+    console.error("Scan failed: expected result not found in scan results");
     return false;
   }
   return true;

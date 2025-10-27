@@ -4,6 +4,7 @@ import {
   ScanType,
   firstScan,
   nextScan,
+  getScanResults,
   runScanTest,
 } from "./scan.js";
 
@@ -21,6 +22,9 @@ rpc.exports = {
   },
   nextScan: (value: number, scanSize: ScanSize, scanType: ScanType): number => {
     return nextScan(value, scanSize, scanType);
+  },
+  getScanResults: (count: number): number[] => {
+    return getScanResults(count);
   },
   runScanTest: (): boolean => {
     return runScanTest();
