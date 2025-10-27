@@ -26,7 +26,7 @@ class Agent(Protocol):
     Defines the interface for the Frida agent script.
     """
     def hello(self) -> Awaitable[Any]: ...
-    def scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
+    def first_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def next_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
 
@@ -169,9 +169,15 @@ class Hub:
                     case "hello":
                         response = await self.agent.hello()
                         to_send = {"event": "hello", "data": response}
-                    case "get-processes":
-                        response = [{"pid": pid, "name": name} for pid, name in self.device.enumerate_processes()]
+                    case "list-processes":
+                        response = [{"pid": proc.pid, "name": proc.name} for proc in self.device.enumerate_processes()]
                         to_send = {"event": "get-processes", "data": response}
+                    case "first-scan":
+                        response = await self.agent.first_scan(params["value"], params["scan_size"], params["scan_type"])
+                        to_send = {"event": "first-scan", "data": response}
+                    case "next-scan":
+                        response = await self.agent.next_scan(params["value"], params["scan_size"], params["scan_type"])
+                        to_send = {"event": "next-scan", "data": response}
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:

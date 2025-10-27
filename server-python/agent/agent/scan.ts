@@ -96,7 +96,7 @@ function checkAddrInResults(addr: NativePointer): boolean {
   return false;
 }
 
-export function scan(
+export function firstScan(
   value: UInt64 | number,
   scanSize: ScanSize,
   scanType: ScanType,
@@ -163,7 +163,7 @@ export function runScanTest(): boolean {
   const secret = new UInt64("0xdeadbeefcafebabe");
   const range = Process.enumerateRanges("rw-")[0];
   range.base.writeU64(secret);
-  scan(secret, ScanSize.U64, ScanType.EXACT);
+  firstScan(secret, ScanSize.U64, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
     console.error("Scan failed: expected result not found in first scan");
     return false;
