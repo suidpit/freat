@@ -11,7 +11,6 @@ import { dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const cModulePath = path.resolve(__dirname, "native/scanner.c");
-const cLogModulePath = path.resolve(__dirname, "native/log.c");
 const outputAgentPath = path.resolve(
   __dirname,
   "../src/freat_server/_agent.js",
@@ -30,8 +29,7 @@ export default {
       delimiters: ['"', '"'],
       values: {
         __C_MODULE_PLACEHOLDER__: JSON.stringify(
-          fs.readFileSync(cModulePath, "utf8") +
-            fs.readFileSync(cLogModulePath, "utf8"),
+          fs.readFileSync(cModulePath, "utf8"),
         ),
       },
     }),
