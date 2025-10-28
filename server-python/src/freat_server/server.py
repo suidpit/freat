@@ -8,7 +8,7 @@ from freat_server.hub import Hub
 APP_NAME = "freat"
 
 
-async def websocket_handler(websocket, path, hub):
+async def websocket_handler(websocket, hub: Hub):
     """
     The handler called for each new UI connection.
     Registers the client and then listens for messages.
@@ -16,7 +16,7 @@ async def websocket_handler(websocket, path, hub):
     hub.register_client(websocket)
     try:
         async for message in websocket:
-            await hub.handle_message(message)
+            await hub.handle_message(websocket, message)
     except websockets.ConnectionClosed:
         print("Client disconnected")
     finally:

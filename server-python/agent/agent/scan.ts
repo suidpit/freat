@@ -25,6 +25,7 @@ const onMessageCallback = new NativeCallback(
 );
 
 let currentScanResults: { ptr: NativePointer; count: number }[] = [];
+let currentScanSize: ScanSize = ScanSize.U32;
 const cScannerCode: string = "__C_MODULE_PLACEHOLDER__";
 (globalThis as any).cm = new CModule(cScannerCode, {
   onMessage: onMessageCallback,
@@ -89,6 +90,26 @@ function _writeValue(
   return valuePtr;
 }
 
+function _readValue(
+  address: NativePointer,
+  scanSize: ScanSize,
+): number | UInt64 {
+  switch (scanSize) {
+    case ScanSize.U8:
+      return address.readU8();
+    case ScanSize.U16:
+      return address.readU16();
+    case ScanSize.U32:
+      return address.readU32();
+    case ScanSize.U64:
+      return address.readU64();
+    case ScanSize.FLOAT:
+      return address.readFloat();
+    case ScanSize.DOUBLE:
+      return address.readDouble();
+  }
+}
+
 function checkAddrInResults(addr: NativePointer): boolean {
   for (const { ptr, count } of currentScanResults) {
     if (find_address_in_results(ptr, count, addr)) return true;
@@ -103,6 +124,7 @@ export function firstScan(
 ): number {
   log(`firstScan(${value}, ${scanSize}, ${scanType})`);
   currentScanResults = [];
+  currentScanSize = scanSize;
   const ranges = Process.enumerateRanges("rw-").concat(
     Process.enumerateMallocRanges(),
   );
@@ -129,12 +151,8 @@ export function firstScan(
   return getCount();
 }
 
-export function nextScan(
-  value: UInt64 | number,
-  scanSize: ScanSize,
-  scanType: ScanType,
-): number {
-  log(`nextScan(${value}, ${scanSize}, ${scanType})`);
+export function nextScan(value: UInt64 | number, scanType: ScanType): number {
+  log(`nextScan(${value}, ${currentScanSize}, ${scanType})`);
   if (currentScanResults.length === 0) {
     console.warn("No previous scan results found");
     return 0;
@@ -145,8 +163,8 @@ export function nextScan(
       ptr,
       count,
       scanType,
-      scanSize,
-      _writeValue(value, scanSize),
+      currentScanSize,
+      _writeValue(value, currentScanSize),
       outCountPtr,
     );
     const newCount = outCountPtr.readU64().toNumber();
@@ -161,17 +179,20 @@ export function nextScan(
   return getCount();
 }
 
-export function getScanResults(maxResults: number = 100): number[] {
+export function getScanResults(maxResults: number = 100): {
+  address: number;
+  value: number | UInt64;
+}[] {
   const results = [];
   let addedResults = 0;
   for (const { ptr, count } of currentScanResults) {
     for (let i = 0; i < count; i++) {
-      results.push(
-        ptr
-          .add(i * Process.pointerSize)
-          .readPointer()
-          .toUInt32(),
-      );
+      const address = ptr.add(i * Process.pointerSize).readPointer();
+      const value = _readValue(address, currentScanSize);
+      results.push({
+        address: address.toUInt32(),
+        value: value,
+      });
       addedResults++;
       if (addedResults >= maxResults) {
         return results;
@@ -199,7 +220,7 @@ export function runScanTest(): boolean {
   const newSecret = new UInt64("0xcafebabedeadbeef");
   range.base.writeU64(newSecret);
   range.base.add(8).writeU64(newSecret);
-  nextScan(newSecret, ScanSize.U64, ScanType.EXACT);
+  nextScan(newSecret, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
     console.error("Scan failed: previous address not found in next scan");
     return false;
@@ -209,7 +230,7 @@ export function runScanTest(): boolean {
     return false;
   }
   const scanResults = getScanResults();
-  if (range.base.toUInt32() != scanResults[0]) {
+  if (range.base.toUInt32() != scanResults[0].address) {
     console.error("Scan failed: expected result not found in scan results");
     return false;
   }

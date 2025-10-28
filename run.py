@@ -56,7 +56,7 @@ def cmd_dev():
     run_cmd("npm run watch", cwd=AGENT_DIR, wait=False)
 
     print("--- Starting Server (live reload) ---")
-    run_cmd("uv run watchfiles python main.py", cwd=HUB_DIR, wait=False)
+    run_cmd("uv run watchfiles freat-server", cwd=HUB_DIR, wait=False)
 
     godot_path = find_godot_executable()
     if not godot_path:

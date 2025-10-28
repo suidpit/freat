@@ -1,0 +1,196 @@
+[gd_scene load_steps=2 format=3 uid="uid://bum8x3nh8r36t"]
+
+[ext_resource type="Script" uid="uid://b43uugxlv3cs5" path="res://scripts/main.gd" id="1_o5qli"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_o5qli")
+
+[node name="UI" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Hub" type="VBoxContainer" parent="UI"]
+visible = false
+layout_mode = 2
+
+[node name="ScanArea" type="HBoxContainer" parent="UI/Hub"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PanelContainer" type="PanelContainer" parent="UI/Hub/ScanArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScanResults" type="MarginContainer" parent="UI/Hub/ScanArea/PanelContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 3.0
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/ScanArea/PanelContainer/ScanResults"]
+layout_mode = 2
+
+[node name="AddressListLabel" type="Label" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+text = "Addresses"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemList" type="ItemList" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+
+[node name="PanelContainer2" type="PanelContainer" parent="UI/Hub/ScanArea"]
+layout_mode = 2
+
+[node name="ScanControls" type="MarginContainer" parent="UI/Hub/ScanArea/PanelContainer2"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+layout_mode = 2
+text = "Scan Controls"
+horizontal_alignment = 1
+
+[node name="HSeparatorControl" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+layout_mode = 2
+
+[node name="GridContainer" type="GridContainer" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+columns = 2
+
+[node name="ScanValueLabel" type="Label" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Value:"
+horizontal_alignment = 2
+
+[node name="ScanValue2" type="LineEdit" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "0xdeadbeef"
+
+[node name="ScanTypeLabel" type="Label" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Type:"
+horizontal_alignment = 2
+
+[node name="ScanType" type="OptionButton" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "Exact Scan"
+popup/item_0/id = 0
+popup/item_1/text = "Greater Than"
+popup/item_1/id = 1
+popup/item_2/text = "Less Than"
+popup/item_2/id = 2
+
+[node name="ScanSizeLabel" type="Label" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+text = "Size:"
+horizontal_alignment = 2
+
+[node name="ScanSize" type="OptionButton" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+layout_mode = 2
+selected = 2
+item_count = 4
+popup/item_0/text = "U8"
+popup/item_0/id = 0
+popup/item_1/text = "U16"
+popup/item_1/id = 1
+popup/item_2/text = "U32"
+popup/item_2/id = 2
+popup/item_3/text = "U64"
+popup/item_3/id = 3
+
+[node name="HSeparatorControl2" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="FirstScanButton" type="Button" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+layout_mode = 2
+text = "First Scan"
+
+[node name="HSeparatorControl3" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+
+[node name="SecondScanButton" type="Button" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+layout_mode = 2
+disabled = true
+text = "Next Scan"
+
+[node name="HSeparatorControl4" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+
+[node name="UndoScanButton" type="Button" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+layout_mode = 2
+disabled = true
+text = "Undo Scan"
+
+[node name="Table" type="PanelContainer" parent="UI/Hub"]
+layout_mode = 2
+
+[node name="PickProcess" type="PopupPanel" parent="UI"]
+oversampling_override = 1.0
+initial_position = 1
+size = Vector2i(400, 600)
+visible = true
+
+[node name="PanelContainer" type="PanelContainer" parent="UI/PickProcess"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 396.0
+offset_bottom = 596.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/PickProcess/PanelContainer"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/PickProcess/PanelContainer/MarginContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Processes"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ProcessList" type="ItemList" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3

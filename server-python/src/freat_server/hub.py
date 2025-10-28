@@ -29,6 +29,8 @@ class Agent(Protocol):
     def first_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def next_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def get_scan_results(self, count: int) -> Awaitable[list[int]]: ...
+    def read_batch(self, addresses: list[tuple[int, int]]) -> Awaitable[dict[int, Any]]: ...
+    def write_batch(self, writes: dict[int, tuple[int, int]]) -> Awaitable[None]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
 
 class Hub:
@@ -43,8 +45,8 @@ class Hub:
         # TODO: implement support for other devices
         self.device = frida.get_local_device()
         self.clients = set()
-        self.watch_list = {}
-        self.freeze_list = {}
+        self.watch_list: set = {}
+        self.freeze_list: dict[int, tuple[int, int]] = {}
         self.polling_task: asyncio.Task | None = None
         self.user_config = user_config
         self.agent_js = self._load_agent_script()
@@ -102,7 +104,7 @@ class Hub:
             script.load()
             self.agent = script.exports_async
             self.polling_task = asyncio.create_task(self._poll_loop())
-            await self.broadcast({"event": "status", "data": f"Attached to {pid}"})
+            await self.broadcast({"event": "attach", "data": pid})
             print(f"Attached to {pid}.")
         except Exception as e:
             print(f"Error attaching to {pid}: {e}")
@@ -145,6 +147,14 @@ class Hub:
                     print("Pool loop: no agent. Breaking.")
                     break
 
+                if watch_job:
+                    response = await self.agent.read_batch(list(watch_job))
+                    await self.broadcast({"event": "watch", "data": response})
+
+                if freeze_job:
+                    response = await self.agent.write_batch(freeze_job)
+
+
                 await asyncio.sleep(0.1)
             except frida.InvalidOperationError:
                 print("Polling failed. Breaking")
@@ -160,9 +170,13 @@ class Hub:
             command = msg.get("command")
             params = msg.get("params", {})
             request_uuid = msg.get("uuid")
+            to_send = None
 
             if command == "attach":
-                self.attach(params["pid"])
+                await self.attach(params["pid"])
+            elif command == "list-processes":
+                response = [{"pid": proc.pid, "name": proc.name} for proc in self.device.enumerate_processes()]
+                to_send = {"event": "list-processes", "data": response}
             else:
                 if self.agent is None:
                     raise AssertionError("Agent is not initialized")
@@ -170,9 +184,6 @@ class Hub:
                     case "hello":
                         response = await self.agent.hello()
                         to_send = {"event": "hello", "data": response}
-                    case "list-processes":
-                        response = [{"pid": proc.pid, "name": proc.name} for proc in self.device.enumerate_processes()]
-                        to_send = {"event": "get-processes", "data": response}
                     case "first-scan":
                         response = await self.agent.first_scan(params["value"], params["scan_size"], params["scan_type"])
                         to_send = {"event": "first-scan", "data": response}
@@ -182,6 +193,14 @@ class Hub:
                     case "get-scan-results":
                         response = await self.agent.get_scan_results(params["count"])
                         to_send = {"event": "get-scan-results", "data": response}
+                    case "add-to-watch-list":
+                        self.watch_list.add((params["address"], params["size"]))
+                    case "remove-from-watch-list":
+                        self.watch_list.remove((params["address"], params["size"]))
+                    case "add-to-freeze-list":
+                        self.freeze_list[params["address"]] = (params["value"], params["size"])
+                    case "remove-from-freeze-list":
+                        self.freeze_list.pop(params["address"], None)
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:
