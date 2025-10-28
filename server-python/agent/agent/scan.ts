@@ -125,27 +125,31 @@ export function firstScan(
   log(`firstScan(${value}, ${scanSize}, ${scanType})`);
   currentScanResults = [];
   currentScanSize = scanSize;
-  const ranges = Process.enumerateRanges("rw-").concat(
-    Process.enumerateMallocRanges(),
-  );
+  const ranges = Process.enumerateRanges("rw-");
   _writeValue(value, scanSize);
   log(`value written at ${valuePtr}: ${valuePtr.readU32()}`);
   for (const range of ranges) {
-    const resultsPtr = scan_region(
-      range.base,
-      range.size,
-      scanType,
-      scanSize,
-      valuePtr,
-      outCountPtr,
-    );
+    try {
+      const resultsPtr = scan_region(
+        range.base,
+        range.size,
+        scanType,
+        scanSize,
+        valuePtr,
+        outCountPtr,
+      );
 
-    const count = outCountPtr.readU64().toNumber();
+      const count = outCountPtr.readU64().toNumber();
 
-    if (count > 0 && !resultsPtr.isNull()) {
-      currentScanResults.push({ ptr: resultsPtr, count });
-    } else {
-      free_results(resultsPtr);
+      if (count > 0 && !resultsPtr.isNull()) {
+        currentScanResults.push({ ptr: resultsPtr, count });
+      } else {
+        free_results(resultsPtr);
+      }
+    } catch (error) {
+      console.error(
+        `Error scanning range ${range.base} - ${range.base.add(range.size)}: ${error}`,
+      );
     }
   }
   return getCount();
@@ -159,24 +163,32 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
   }
   const newResults = [];
   for (const { ptr, count } of currentScanResults) {
-    const newResultsPtr = filter_scans(
-      ptr,
-      count,
-      scanType,
-      currentScanSize,
-      _writeValue(value, currentScanSize),
-      outCountPtr,
-    );
-    const newCount = outCountPtr.readU64().toNumber();
-    free_results(ptr);
-    if (newCount > 0 && !newResultsPtr.isNull()) {
-      newResults.push({ ptr: newResultsPtr, count: newCount });
-    } else {
-      free_results(newResultsPtr);
+    try {
+      const newResultsPtr = filter_scans(
+        ptr,
+        count,
+        scanType,
+        currentScanSize,
+        _writeValue(value, currentScanSize),
+        outCountPtr,
+      );
+      const newCount = outCountPtr.readU64().toNumber();
+      free_results(ptr);
+      if (newCount > 0 && !newResultsPtr.isNull()) {
+        newResults.push({ ptr: newResultsPtr, count: newCount });
+      } else {
+        free_results(newResultsPtr);
+      }
+    } catch (error) {
+      console.error(`Error filtering results in ${ptr} (#${count})`, error);
     }
   }
   currentScanResults = newResults;
   return getCount();
+}
+
+export function undoScan() {
+  currentScanResults = [];
 }
 
 export function getScanResults(maxResults: number = 100): {

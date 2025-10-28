@@ -57,8 +57,11 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ItemList" type="ItemList" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScrollContainer"]
+[node name="AddressList" type="ItemList" parent="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScrollContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+auto_width = true
 
 [node name="PanelContainer2" type="PanelContainer" parent="UI/Hub/ScanArea"]
 layout_mode = 2
@@ -95,7 +98,7 @@ layout_mode = 2
 text = "Value:"
 horizontal_alignment = 2
 
-[node name="ScanValue2" type="LineEdit" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
+[node name="ScanValue" type="LineEdit" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "0xdeadbeef"
@@ -124,7 +127,7 @@ horizontal_alignment = 2
 [node name="ScanSize" type="OptionButton" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
 layout_mode = 2
 selected = 2
-item_count = 4
+item_count = 6
 popup/item_0/text = "U8"
 popup/item_0/id = 0
 popup/item_1/text = "U16"
@@ -133,6 +136,10 @@ popup/item_2/text = "U32"
 popup/item_2/id = 2
 popup/item_3/text = "U64"
 popup/item_3/id = 3
+popup/item_4/text = "FLOAT"
+popup/item_4/id = 4
+popup/item_5/text = "DOUBLE"
+popup/item_5/id = 5
 
 [node name="HSeparatorControl2" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
 custom_minimum_size = Vector2(0, 20)
@@ -163,17 +170,14 @@ text = "Undo Scan"
 [node name="Table" type="PanelContainer" parent="UI/Hub"]
 layout_mode = 2
 
-[node name="PickProcess" type="PopupPanel" parent="UI"]
-oversampling_override = 1.0
-initial_position = 1
-size = Vector2i(400, 600)
-visible = true
+[node name="PickProcess" type="PanelContainer" parent="UI"]
+custom_minimum_size = Vector2(350, 400)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 
 [node name="PanelContainer" type="PanelContainer" parent="UI/PickProcess"]
-offset_left = 4.0
-offset_top = 4.0
-offset_right = 396.0
-offset_bottom = 596.0
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
@@ -194,3 +198,11 @@ layout_mode = 2
 [node name="ProcessList" type="ItemList" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+
+[node name="HSeparator2" type="HSeparator" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SearchProcess" type="LineEdit" parent="UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "Process name..."
+alignment = 1

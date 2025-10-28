@@ -4,6 +4,7 @@ import {
   ScanType,
   firstScan,
   nextScan,
+  undoScan,
   getScanResults,
   runScanTest,
 } from "./scan.js";
@@ -28,6 +29,9 @@ rpc.exports = {
     count: number,
   ): { address: number; value: number | UInt64 }[] => {
     return getScanResults(count);
+  },
+  undoScan: () => {
+    undoScan();
   },
   runScanTest: (): boolean => {
     return runScanTest();

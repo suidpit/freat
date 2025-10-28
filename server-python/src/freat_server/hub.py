@@ -18,8 +18,8 @@ class ScanSize(Enum):
 
 class ScanType(Enum):
     EXACT = 0
-    LESS_THAN = 1
-    GREATER_THAN = 2
+    GREATER_THAN = 1
+    LESS_THAN = 2
 
 class Agent(Protocol):
     """
@@ -28,7 +28,8 @@ class Agent(Protocol):
     def hello(self) -> Awaitable[Any]: ...
     def first_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
     def next_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
-    def get_scan_results(self, count: int) -> Awaitable[list[int]]: ...
+    def undo_scan(self) -> Awaitable[None]: ...
+    def get_scan_results(self, count: int) -> Awaitable[dict[str, int]]: ...
     def read_batch(self, addresses: list[tuple[int, int]]) -> Awaitable[dict[int, Any]]: ...
     def write_batch(self, writes: dict[int, tuple[int, int]]) -> Awaitable[None]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
@@ -51,6 +52,7 @@ class Hub:
         self.user_config = user_config
         self.agent_js = self._load_agent_script()
         self.loop = asyncio.get_event_loop()
+        self.top_results_count = 100
 
     def _load_agent_script(self) -> str:
         print("Loading agent script...")
@@ -92,7 +94,7 @@ class Hub:
         try:
             # If we're already attached, we detach.
             if self.session:
-                self.detach()
+                await self.detach()
 
             self.session = frida.attach(pid)
             self.session.on(
@@ -131,7 +133,7 @@ class Hub:
 
         self.session = None
         self.agent = None
-        await self.broadcast({"event": "status", "data": "Detached"})
+        await self.broadcast({"event": "status", "data": "detached"})
 
 
     async def _poll_loop(self):
@@ -154,6 +156,9 @@ class Hub:
                 if freeze_job:
                     response = await self.agent.write_batch(freeze_job)
 
+                current_scan_top_results = await self.agent.get_scan_results(self.top_results_count)
+                if current_scan_top_results:
+                    await self.broadcast({"event": "current-scan-results", "data": current_scan_top_results})
 
                 await asyncio.sleep(0.1)
             except frida.InvalidOperationError:
@@ -177,6 +182,9 @@ class Hub:
             elif command == "list-processes":
                 response = [{"pid": proc.pid, "name": proc.name} for proc in self.device.enumerate_processes()]
                 to_send = {"event": "list-processes", "data": response}
+            elif command == "status":
+                response = "attached" if self.agent else "detached"
+                to_send = {"event": "status", "data": response}
             else:
                 if self.agent is None:
                     raise AssertionError("Agent is not initialized")
@@ -190,9 +198,9 @@ class Hub:
                     case "next-scan":
                         response = await self.agent.next_scan(params["value"], params["scan_size"], params["scan_type"])
                         to_send = {"event": "next-scan", "data": response}
-                    case "get-scan-results":
-                        response = await self.agent.get_scan_results(params["count"])
-                        to_send = {"event": "get-scan-results", "data": response}
+                    case "undo-scan":
+                        response = await self.agent.undo_scan()
+                        to_send = {"event": "undo-scan", "data": response}
                     case "add-to-watch-list":
                         self.watch_list.add((params["address"], params["size"]))
                     case "remove-from-watch-list":

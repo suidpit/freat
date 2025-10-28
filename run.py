@@ -2,6 +2,7 @@ import argparse
 import atexit
 import os
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -45,7 +46,7 @@ def find_godot_executable() -> str | None:
     godot_path = shutil.which("godot")
     if godot_path is not None:
         return godot_path
-    if os.name == "darwin":
+    if sys.platform == "darwin":
         return "/Applications/Godot.app/Contents/MacOS/Godot"
     return None
 

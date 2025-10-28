@@ -7,10 +7,10 @@ signal error_received(message: String)
 
 var _client := WebSocketPeer.new()
 var _is_connected := false
-	
+
 func connect_to_server(url: String):
 	_client.connect_to_url(url)
-	
+
 func _process(_delta: float):
 	_client.poll()
 	var state = _client.get_ready_state()
@@ -27,11 +27,11 @@ func _process(_delta: float):
 			if _is_connected:
 				_is_connected = false
 				_on_disconnected()
-		
+
 func _on_connected():
 	_is_connected = true
 	connected.emit()
-	
+
 func _on_disconnected():
 	disconnected.emit()
 
@@ -46,7 +46,7 @@ func _on_message():
 		return
 	var data: Dictionary = json.get_data()
 	message_received.emit(data)
-	
+
 func send_message(data: Dictionary):
 	if not _is_connected:
 		print("Not connected, can't send a message.")
