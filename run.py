@@ -8,9 +8,12 @@ from pathlib import Path
 
 processes: list[subprocess.Popen] = []
 
-AGENT_DIR = str(Path(__file__).parent / "server-python" / "agent")
-HUB_DIR = str(Path(__file__).parent / "server-python")
-GUI_DIR = str(Path(__file__).parent / "client-godot")
+PROJECT_ROOT = Path(__file__).parent
+AGENT_DIR = str(PROJECT_ROOT / "server-python" / "agent")
+HUB_DIR = str(PROJECT_ROOT / "server-python")
+GUI_DIR = str(PROJECT_ROOT / "client-godot")
+BUILD_DIR = PROJECT_ROOT / "build"
+DIST_DIR = PROJECT_ROOT / "dist"
 
 
 def cleanup():
@@ -83,6 +86,101 @@ def cmd_test():
     print("--- Running tests ---")
     run_cmd("uv run pytest", cwd=HUB_DIR, wait=True)
 
+
+def cmd_build():
+    """Build release package for distribution."""
+
+    print("=" * 50)
+    print("Building Freat Release Package")
+    print("=" * 50)
+    print()
+
+    print("→ Cleaning build directories...")
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+    if DIST_DIR.exists():
+        shutil.rmtree(DIST_DIR)
+    BUILD_DIR.mkdir(parents=True)
+    DIST_DIR.mkdir(parents=True)
+    print("✓ Build directories cleaned")
+
+    print("\n→ Building Frida agent...")
+    run_cmd("npm install", cwd=AGENT_DIR, wait=True)
+    run_cmd("npm run build", cwd=AGENT_DIR, wait=True)
+
+    agent_js = Path(HUB_DIR) / "src" / "freat_server" / "_agent.js"
+    if not agent_js.exists():
+        print("❌ ERROR: Agent build failed - _agent.js not found")
+        sys.exit(1)
+    print("✓ Agent built successfully")
+
+    print("\n→ Exporting Godot project...")
+    godot_path = find_godot_executable()
+    if not godot_path:
+        print("❌ ERROR: Godot executable not found")
+        print("   Please install Godot 4.4+ or set it in PATH")
+        sys.exit(1)
+
+    app_path = BUILD_DIR / "Freat.app"
+    export_cmd = f'{godot_path} --headless --export-release "macOS" {app_path}'
+    run_cmd(export_cmd, cwd=GUI_DIR, wait=True, shell=True)
+
+    if not app_path.exists():
+        print("❌ ERROR: Godot export failed")
+        sys.exit(1)
+    print("✓ Godot project exported")
+
+    print("\n→ Building Python package...")
+    run_cmd("uv build", cwd=HUB_DIR, wait=True)
+
+    dist_dir = Path(HUB_DIR) / "dist"
+    wheels = list(dist_dir.glob("*.whl"))
+    if not wheels:
+        print("❌ ERROR: No wheel file found in dist/")
+        sys.exit(1)
+
+    wheel_file = wheels[0]
+    print(f"✓ Python package built: {wheel_file.name}")
+    print(f"   Install separately with: pip install {wheel_file}")
+
+    print("\n→ Creating DMG...")
+
+    version = "0.1.0"
+    pyproject = Path(HUB_DIR) / "pyproject.toml"
+    if pyproject.exists():
+        import re
+        content = pyproject.read_text()
+        match = re.search(r'version\s*=\s*"([^"]+)"', content)
+        if match:
+            version = match.group(1)
+
+    dmg_name = f"Freat-v{version}-macOS.dmg"
+    dmg_path = DIST_DIR / dmg_name
+
+    hdiutil_cmd = f'hdiutil create -volname "Freat" -srcfolder "{app_path}" -ov -format UDZO "{dmg_path}"'
+    run_cmd(hdiutil_cmd, wait=True, shell=True, cleanup=False)
+
+    if not dmg_path.exists():
+        print("❌ ERROR: DMG creation failed")
+        sys.exit(1)
+
+    print(f"✓ DMG created: {dmg_path}")
+
+    dmg_size = dmg_path.stat().st_size / (1024 * 1024)
+    print()
+    print("=" * 50)
+    print("✅ Build Complete!")
+    print("=" * 50)
+    print()
+    print(f"Output: {dmg_path}")
+    print(f"Size: {dmg_size:.1f} MB")
+    print()
+    print("📦 To use Freat:")
+    print(f"   1. Install server: pip install {wheel_file}")
+    print("   2. Start server: freat-server")
+    print("   3. Launch GUI from DMG")
+    print()
+
 def main():
     parser = argparse.ArgumentParser(description="freat - an instrumentation toolkit")
     subparser = parser.add_subparsers(dest="command", required=True)
@@ -90,6 +188,7 @@ def main():
         "dev", help="Run all components in live-reload development mode"
     )
     subparser.add_parser("test", help="Run the test suite")
+    subparser.add_parser("build", help="Build release package for distribution")
 
     args = parser.parse_args()
 
@@ -98,6 +197,8 @@ def main():
             cmd_dev()
         case "test":
             cmd_test()
+        case "build":
+            cmd_build()
         case _:
             print("Invalid command")
 

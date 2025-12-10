@@ -218,3 +218,5 @@ __marimo__/
 .DS_Store
 .clangd
 *_agent.js
+
+*.dmg

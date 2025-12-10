@@ -24,3 +24,7 @@ RPCManager="*res://scripts/RPCManager.gd"
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/dpi/allow_hidpi=false
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

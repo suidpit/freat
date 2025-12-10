@@ -15,6 +15,24 @@ Freat is made of the following components:
 - Hub: a Python program that manages agent creation and interaction. It exposes a WebSocket RPC API to implement the commands.
 - GUI: the tool UI implemented in Godot. It connects to the Hub to send commands and receive updates.
 
+## Installation
+
+If you just want to use Freat (not develop it), here's what you need to do:
+
+1. Install the server:
+   ```bash
+   pip install freat_server-0.1.0-py3-none-any.whl
+   ```
+
+2. Start the server:
+   ```bash
+   freat-server
+   ```
+
+3. Launch the GUI by opening the Freat app from the DMG.
+
+The server and GUI need to run simultaneously – the GUI connects to the server on `localhost:8765`. Keep the server running in a terminal while you use the app.
+
 ## Development
 
 In order to hack with this project, you need to make sure you have:
