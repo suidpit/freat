@@ -1,6 +1,6 @@
 import { log } from "./logger.js";
+import { DataType } from "./types.js";
 import {
-  ScanSize,
   ScanType,
   firstScan,
   nextScan,
@@ -17,10 +17,10 @@ rpc.exports = {
   },
   firstScan: (
     value: number,
-    scanSize: ScanSize,
+    dataType: DataType,
     scanType: ScanType,
   ): number => {
-    return firstScan(value, scanSize, scanType);
+    return firstScan(value, dataType, scanType);
   },
   nextScan: (value: number, scanType: ScanType): number => {
     return nextScan(value, scanType);
@@ -36,10 +36,10 @@ rpc.exports = {
   runScanTest: (): boolean => {
     return runScanTest();
   },
-  readBatch: (addresses: number[]): { [key: number]: any } => {
+  readBatch: (addresses: [number, DataType][]): { [key: number]: any } => {
     return readBatch(addresses);
   },
-  writeBatch: (writes: { [key: number]: [number, number] }): void => {
+  writeBatch: (writes: [number, any, DataType][]): void => {
     return writeBatch(writes);
   },
 };

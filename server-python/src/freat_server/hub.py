@@ -8,13 +8,14 @@ from enum import Enum
 from frida.core import Script, ScriptExportsAsync
 from typing import Any, Awaitable, Protocol
 
-class ScanSize(Enum):
-    U8 = 0
-    U16 = 1
-    U32 = 2
-    U64 = 3
-    FLOAT = 4
-    DOUBLE = 5
+class DataType(Enum):
+    U8 = "u8"
+    U16 = "u16"
+    U32 = "u32"
+    U64 = "u64"
+    FLOAT = "float"
+    DOUBLE = "double"
+    STRING = "string"
 
 class ScanType(Enum):
     EXACT = 0
@@ -26,12 +27,12 @@ class Agent(Protocol):
     Defines the interface for the Frida agent script.
     """
     def hello(self) -> Awaitable[Any]: ...
-    def first_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
-    def next_scan(self, value: int, scan_size: int, scan_type: int) -> Awaitable[int]: ...
+    def first_scan(self, value: int, data_type: str, scan_type: int) -> Awaitable[int]: ...
+    def next_scan(self, value: int, scan_type: int) -> Awaitable[int]: ...
     def undo_scan(self) -> Awaitable[None]: ...
     def get_scan_results(self, count: int) -> Awaitable[dict[str, int]]: ...
-    def read_batch(self, addresses: list[tuple[int, int]]) -> Awaitable[dict[int, Any]]: ...
-    def write_batch(self, writes: dict[int, tuple[int, int]]) -> Awaitable[None]: ...
+    def read_batch(self, addresses: list[tuple[int, str]]) -> Awaitable[dict[int, Any]]: ...
+    def write_batch(self, writes: list[tuple[int, Any, str]]) -> Awaitable[None]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
 
 class Hub:
@@ -46,8 +47,8 @@ class Hub:
         # TODO: implement support for other devices
         self.device = frida.get_local_device()
         self.clients = set()
-        self.watch_list: set = {}
-        self.freeze_list: dict[int, tuple[int, int]] = {}
+        self.watch_list: set[tuple[int, str]] = set()
+        self.freeze_list: list[tuple[int, Any, str]] = []
         self.polling_task: asyncio.Task | None = None
         self.user_config = user_config
         self.agent_js = self._load_agent_script()
@@ -142,19 +143,17 @@ class Hub:
         """
         while True:
             try:
-                watch_job = self.watch_list.copy()
-                freeze_job = self.freeze_list.copy()
-
                 if not self.agent:
                     print("Pool loop: no agent. Breaking.")
                     break
 
-                if watch_job:
-                    response = await self.agent.read_batch(list(watch_job))
+                if self.watch_list:
+                    watch_job = list(self.watch_list)
+                    response = await self.agent.read_batch(watch_job)
                     await self.broadcast({"event": "watch", "data": response})
 
-                if freeze_job:
-                    response = await self.agent.write_batch(freeze_job)
+                if self.freeze_list:
+                    await self.agent.write_batch(self.freeze_list)
 
                 current_scan_top_results = await self.agent.get_scan_results(self.top_results_count)
                 if current_scan_top_results:
@@ -193,22 +192,22 @@ class Hub:
                         response = await self.agent.hello()
                         to_send = {"event": "hello", "data": response}
                     case "first-scan":
-                        response = await self.agent.first_scan(params["value"], params["scan_size"], params["scan_type"])
+                        response = await self.agent.first_scan(params["value"], params["data_type"], params["scan_type"])
                         to_send = {"event": "first-scan", "data": response}
                     case "next-scan":
-                        response = await self.agent.next_scan(params["value"], params["scan_size"], params["scan_type"])
+                        response = await self.agent.next_scan(params["value"], params["scan_type"])
                         to_send = {"event": "next-scan", "data": response}
                     case "undo-scan":
                         response = await self.agent.undo_scan()
                         to_send = {"event": "undo-scan", "data": response}
                     case "add-to-watch-list":
-                        self.watch_list.add((params["address"], params["size"]))
+                        self.watch_list.add((params["address"], params["data_type"]))
                     case "remove-from-watch-list":
-                        self.watch_list.remove((params["address"], params["size"]))
+                        self.watch_list.discard((params["address"], params["data_type"]))
                     case "add-to-freeze-list":
-                        self.freeze_list[params["address"]] = (params["value"], params["size"])
+                        self.freeze_list.append((params["address"], params["value"], params["data_type"]))
                     case "remove-from-freeze-list":
-                        self.freeze_list.pop(params["address"], None)
+                        self.freeze_list = [(addr, val, dt) for addr, val, dt in self.freeze_list if addr != params["address"]]
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:

@@ -1,18 +1,39 @@
 import { log } from "./logger.js";
-
-export enum ScanSize {
-  U8,
-  U16,
-  U32,
-  U64,
-  FLOAT,
-  DOUBLE,
-}
+import { DataType } from "./types.js";
 
 export enum ScanType {
   EXACT,
   LESS_THAN,
   GREATER_THAN,
+}
+
+// C code expects integer enums for ScanSize, so we convert DataType strings to integers
+enum CScanSize {
+  U8 = 0,
+  U16 = 1,
+  U32 = 2,
+  U64 = 3,
+  FLOAT = 4,
+  DOUBLE = 5,
+}
+
+function dataTypeToCScanSize(dataType: DataType): CScanSize {
+  switch (dataType) {
+    case DataType.U8:
+      return CScanSize.U8;
+    case DataType.U16:
+      return CScanSize.U16;
+    case DataType.U32:
+      return CScanSize.U32;
+    case DataType.U64:
+      return CScanSize.U64;
+    case DataType.FLOAT:
+      return CScanSize.FLOAT;
+    case DataType.DOUBLE:
+      return CScanSize.DOUBLE;
+    default:
+      throw new Error(`Unsupported data type for C scan: ${dataType}`);
+  }
 }
 
 const onMessageCallback = new NativeCallback(
@@ -25,7 +46,7 @@ const onMessageCallback = new NativeCallback(
 );
 
 let currentScanResults: { ptr: NativePointer; count: number }[] = [];
-let currentScanSize: ScanSize = ScanSize.U32;
+let currentDataType: DataType = DataType.U32;
 const cScannerCode: string = "__C_MODULE_PLACEHOLDER__";
 (globalThis as any).cm = new CModule(cScannerCode, {
   onMessage: onMessageCallback,
@@ -63,26 +84,26 @@ export function getCount(): number {
 
 function _writeValue(
   value: number | UInt64,
-  scanSize: ScanSize,
+  dataType: DataType,
 ): NativePointer {
-  switch (scanSize) {
-    case ScanSize.U8:
+  switch (dataType) {
+    case DataType.U8:
       valuePtr.writeU8(value);
       break;
-    case ScanSize.U16:
+    case DataType.U16:
       valuePtr.writeU16(value);
       break;
-    case ScanSize.U32:
+    case DataType.U32:
       valuePtr.writeU32(value);
       break;
-    case ScanSize.U64:
+    case DataType.U64:
       valuePtr.writeU64(value);
       break;
-    case ScanSize.FLOAT:
+    case DataType.FLOAT:
       if (typeof value !== "number") throw new Error("Invalid value type");
       valuePtr.writeFloat(value);
       break;
-    case ScanSize.DOUBLE:
+    case DataType.DOUBLE:
       if (typeof value !== "number") throw new Error("Invalid value type");
       valuePtr.writeDouble(value);
       break;
@@ -92,21 +113,23 @@ function _writeValue(
 
 function _readValue(
   address: NativePointer,
-  scanSize: ScanSize,
+  dataType: DataType,
 ): number | UInt64 {
-  switch (scanSize) {
-    case ScanSize.U8:
+  switch (dataType) {
+    case DataType.U8:
       return address.readU8();
-    case ScanSize.U16:
+    case DataType.U16:
       return address.readU16();
-    case ScanSize.U32:
+    case DataType.U32:
       return address.readU32();
-    case ScanSize.U64:
+    case DataType.U64:
       return address.readU64();
-    case ScanSize.FLOAT:
+    case DataType.FLOAT:
       return address.readFloat();
-    case ScanSize.DOUBLE:
+    case DataType.DOUBLE:
       return address.readDouble();
+    default:
+      throw new Error(`Unsupported data type: ${dataType}`);
   }
 }
 
@@ -119,22 +142,23 @@ function checkAddrInResults(addr: NativePointer): boolean {
 
 export function firstScan(
   value: UInt64 | number,
-  scanSize: ScanSize,
+  dataType: DataType,
   scanType: ScanType,
 ): number {
-  log(`firstScan(${value}, ${scanSize}, ${scanType})`);
+  log(`firstScan(${value}, ${dataType}, ${scanType})`);
   currentScanResults = [];
-  currentScanSize = scanSize;
+  currentDataType = dataType;
   const ranges = Process.enumerateRanges("rw-");
-  _writeValue(value, scanSize);
+  _writeValue(value, dataType);
   log(`value written at ${valuePtr}: ${valuePtr.readU32()}`);
+  const cScanSize = dataTypeToCScanSize(dataType);
   for (const range of ranges) {
     try {
       const resultsPtr = scan_region(
         range.base,
         range.size,
         scanType,
-        scanSize,
+        cScanSize,
         valuePtr,
         outCountPtr,
       );
@@ -156,11 +180,12 @@ export function firstScan(
 }
 
 export function nextScan(value: UInt64 | number, scanType: ScanType): number {
-  log(`nextScan(${value}, ${currentScanSize}, ${scanType})`);
+  log(`nextScan(${value}, ${currentDataType}, ${scanType})`);
   if (currentScanResults.length === 0) {
     console.warn("No previous scan results found");
     return 0;
   }
+  const cScanSize = dataTypeToCScanSize(currentDataType);
   const newResults = [];
   for (const { ptr, count } of currentScanResults) {
     try {
@@ -168,8 +193,8 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
         ptr,
         count,
         scanType,
-        currentScanSize,
-        _writeValue(value, currentScanSize),
+        cScanSize,
+        _writeValue(value, currentDataType),
         outCountPtr,
       );
       const newCount = outCountPtr.readU64().toNumber();
@@ -200,7 +225,7 @@ export function getScanResults(maxResults: number = 100): {
   for (const { ptr, count } of currentScanResults) {
     for (let i = 0; i < count; i++) {
       const address = ptr.add(i * Process.pointerSize).readPointer();
-      const value = _readValue(address, currentScanSize);
+      const value = _readValue(address, currentDataType);
       results.push({
         address: address.toUInt32(),
         value: value,
@@ -219,12 +244,12 @@ export function runScanTest(): boolean {
   const range = Process.enumerateRanges("rw-")[0];
   range.base.writeU64(secret);
 
-  firstScan(0xcafebabe, ScanSize.U32, ScanType.EXACT);
+  firstScan(0xcafebabe, DataType.U32, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
     console.error("Scan failed: expected U32 result not found in first scan");
     return false;
   }
-  firstScan(secret, ScanSize.U64, ScanType.EXACT);
+  firstScan(secret, DataType.U64, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
     console.error("Scan failed: expected result not found in first scan");
     return false;
