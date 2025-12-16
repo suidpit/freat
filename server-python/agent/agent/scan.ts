@@ -161,36 +161,118 @@ export function getScanResults(maxResults: number = 100): {
 }
 
 export function runScanTest(): boolean {
-  const secret = new UInt64("0xdeadbeefcafebabe");
   const range = Process.enumerateRanges("rw-")[0];
-  range.base.writeU64(secret);
 
+  // Test 1: EXACT scan with U32
+  const secret = new UInt64("0xdeadbeefcafebabe");
+  range.base.writeU64(secret);
   firstScan(0xcafebabe, DataType.U32, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
-    console.error("Scan failed: expected U32 result not found in first scan");
+    console.error("Test 1 failed: expected U32 result not found in first scan");
     return false;
   }
+
+  // Test 2: EXACT scan with U64
   firstScan(secret, DataType.U64, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
-    console.error("Scan failed: expected result not found in first scan");
+    console.error("Test 2 failed: expected result not found in first scan");
     return false;
   }
+
+  // Test 3: EXACT next scan
   const newSecret = new UInt64("0xcafebabedeadbeef");
   range.base.writeU64(newSecret);
   range.base.add(8).writeU64(newSecret);
   nextScan(newSecret, ScanType.EXACT);
   if (!checkAddrInResults(range.base)) {
-    console.error("Scan failed: previous address not found in next scan");
+    console.error("Test 3 failed: previous address not found in next scan");
     return false;
   }
   if (checkAddrInResults(range.base.add(8))) {
-    console.error("Scan failed: unexpected address found in next scan");
+    console.error("Test 3 failed: unexpected address found in next scan");
     return false;
   }
+
+  // Test 4: getScanResults returns correct address
   const scanResults = getScanResults();
   if (range.base.toString() != scanResults[0].address) {
-    console.error("Scan failed: expected result not found in scan results");
+    console.error("Test 4 failed: expected result not found in scan results");
     return false;
   }
+
+  // Test 5: LESS_THAN scan
+  range.base.writeU32(100);
+  range.base.add(4).writeU32(50);
+  range.base.add(8).writeU32(200);
+  firstScan(150, DataType.U32, ScanType.LESS_THAN);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 5 failed: value 100 should be < 150");
+    return false;
+  }
+  if (!checkAddrInResults(range.base.add(4))) {
+    console.error("Test 5 failed: value 50 should be < 150");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(8))) {
+    console.error("Test 5 failed: value 200 should NOT be < 150");
+    return false;
+  }
+
+  // Test 6: LESS_THAN next scan (edge case: exact boundary)
+  nextScan(100, ScanType.LESS_THAN);
+  if (!checkAddrInResults(range.base.add(4))) {
+    console.error("Test 6 failed: value 50 should be < 100");
+    return false;
+  }
+  if (checkAddrInResults(range.base)) {
+    console.error("Test 6 failed: value 100 should NOT be < 100 (boundary)");
+    return false;
+  }
+
+  // Test 7: GREATER_THAN scan
+  range.base.writeU32(100);
+  range.base.add(4).writeU32(50);
+  range.base.add(8).writeU32(200);
+  firstScan(75, DataType.U32, ScanType.GREATER_THAN);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 7 failed: value 100 should be > 75");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 7 failed: value 50 should NOT be > 75");
+    return false;
+  }
+  if (!checkAddrInResults(range.base.add(8))) {
+    console.error("Test 7 failed: value 200 should be > 75");
+    return false;
+  }
+
+  // Test 8: GREATER_THAN next scan (edge case: zero)
+  range.base.writeU32(0);
+  range.base.add(4).writeU32(1);
+  firstScan(0, DataType.U32, ScanType.GREATER_THAN);
+  if (checkAddrInResults(range.base)) {
+    console.error("Test 8 failed: value 0 should NOT be > 0");
+    return false;
+  }
+  if (!checkAddrInResults(range.base.add(4))) {
+    console.error("Test 8 failed: value 1 should be > 0");
+    return false;
+  }
+
+  // Test 9: GREATER_THAN with negative-like values (U32 overflow edge case)
+  range.base.writeU32(0xFFFFFFFF); // Max U32
+  range.base.add(4).writeU32(0xFFFFFFFE);
+  firstScan(0xFFFFFFFE, DataType.U32, ScanType.GREATER_THAN);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 9 failed: 0xFFFFFFFF should be > 0xFFFFFFFE");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 9 failed: 0xFFFFFFFE should NOT be > 0xFFFFFFFE");
+    return false;
+  }
+
+  console.log("All scan tests passed!");
   return true;
 }
