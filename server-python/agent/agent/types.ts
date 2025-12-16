@@ -1,9 +1,9 @@
 export enum DataType {
-  U8 = "u8",
-  U16 = "u16",
-  U32 = "u32",
-  U64 = "u64",
-  FLOAT = "float",
-  DOUBLE = "double",
-  STRING = "string",
+  U8 = 0,
+  U16 = 1,
+  U32 = 2,
+  U64 = 3,
+  FLOAT = 4,
+  DOUBLE = 5,
+  STRING = 6
 }

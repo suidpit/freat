@@ -1,4 +1,5 @@
 import { log } from "./logger.js";
+import { readValue, writeValue } from "./memory.js";
 import { DataType } from "./types.js";
 
 export enum ScanType {
@@ -8,34 +9,6 @@ export enum ScanType {
 }
 
 // C code expects integer enums for ScanSize, so we convert DataType strings to integers
-enum CScanSize {
-  U8 = 0,
-  U16 = 1,
-  U32 = 2,
-  U64 = 3,
-  FLOAT = 4,
-  DOUBLE = 5,
-}
-
-function dataTypeToCScanSize(dataType: DataType): CScanSize {
-  switch (dataType) {
-    case DataType.U8:
-      return CScanSize.U8;
-    case DataType.U16:
-      return CScanSize.U16;
-    case DataType.U32:
-      return CScanSize.U32;
-    case DataType.U64:
-      return CScanSize.U64;
-    case DataType.FLOAT:
-      return CScanSize.FLOAT;
-    case DataType.DOUBLE:
-      return CScanSize.DOUBLE;
-    default:
-      throw new Error(`Unsupported data type for C scan: ${dataType}`);
-  }
-}
-
 const onMessageCallback = new NativeCallback(
   (messagePtr) => {
     const message = messagePtr!.readUtf8String();
@@ -82,57 +55,6 @@ export function getCount(): number {
   return currentScanResults.reduce((acc, { count }) => acc + count, 0);
 }
 
-function _writeValue(
-  value: number | UInt64,
-  dataType: DataType,
-): NativePointer {
-  switch (dataType) {
-    case DataType.U8:
-      valuePtr.writeU8(value);
-      break;
-    case DataType.U16:
-      valuePtr.writeU16(value);
-      break;
-    case DataType.U32:
-      valuePtr.writeU32(value);
-      break;
-    case DataType.U64:
-      valuePtr.writeU64(value);
-      break;
-    case DataType.FLOAT:
-      if (typeof value !== "number") throw new Error("Invalid value type");
-      valuePtr.writeFloat(value);
-      break;
-    case DataType.DOUBLE:
-      if (typeof value !== "number") throw new Error("Invalid value type");
-      valuePtr.writeDouble(value);
-      break;
-  }
-  return valuePtr;
-}
-
-function _readValue(
-  address: NativePointer,
-  dataType: DataType,
-): number | UInt64 {
-  switch (dataType) {
-    case DataType.U8:
-      return address.readU8();
-    case DataType.U16:
-      return address.readU16();
-    case DataType.U32:
-      return address.readU32();
-    case DataType.U64:
-      return address.readU64();
-    case DataType.FLOAT:
-      return address.readFloat();
-    case DataType.DOUBLE:
-      return address.readDouble();
-    default:
-      throw new Error(`Unsupported data type: ${dataType}`);
-  }
-}
-
 function checkAddrInResults(addr: NativePointer): boolean {
   for (const { ptr, count } of currentScanResults) {
     if (find_address_in_results(ptr, count, addr)) return true;
@@ -149,16 +71,15 @@ export function firstScan(
   currentScanResults = [];
   currentDataType = dataType;
   const ranges = Process.enumerateRanges("rw-");
-  _writeValue(value, dataType);
+  writeValue(valuePtr, value, dataType);
   log(`value written at ${valuePtr}: ${valuePtr.readU32()}`);
-  const cScanSize = dataTypeToCScanSize(dataType);
   for (const range of ranges) {
     try {
       const resultsPtr = scan_region(
         range.base,
         range.size,
         scanType,
-        cScanSize,
+        dataType,
         valuePtr,
         outCountPtr,
       );
@@ -185,16 +106,16 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
     console.warn("No previous scan results found");
     return 0;
   }
-  const cScanSize = dataTypeToCScanSize(currentDataType);
   const newResults = [];
   for (const { ptr, count } of currentScanResults) {
     try {
+      writeValue(valuePtr, value, currentDataType);
       const newResultsPtr = filter_scans(
         ptr,
         count,
         scanType,
-        cScanSize,
-        _writeValue(value, currentDataType),
+        currentDataType,
+        valuePtr,
         outCountPtr,
       );
       const newCount = outCountPtr.readU64().toNumber();
@@ -225,7 +146,7 @@ export function getScanResults(maxResults: number = 100): {
   for (const { ptr, count } of currentScanResults) {
     for (let i = 0; i < count; i++) {
       const address = ptr.add(i * Process.pointerSize).readPointer();
-      const value = _readValue(address, currentDataType);
+      const value = readValue(address, currentDataType);
       results.push({
         address: address.toUInt32(),
         value: value,

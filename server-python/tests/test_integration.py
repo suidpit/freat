@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import subprocess
 
-from freat_server.hub import Hub, ScanSize, ScanType
+from freat_server.hub import Hub, DataType, ScanType
 
 @pytest_asyncio.fixture(scope="function")
 async def test_hub():

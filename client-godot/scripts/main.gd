@@ -6,7 +6,7 @@ extends Control
 @onready var first_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/FirstScanButton
 @onready var scan_value: LineEdit = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/ScanValue
 @onready var scan_type: OptionButton = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/ScanType
-@onready var scan_size: OptionButton = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/ScanSize
+@onready var data_type: OptionButton = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/DataType
 @onready var second_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/SecondScanButton
 @onready var undo_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/UndoScanButton
 @onready var search_process: LineEdit = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/SearchProcess
@@ -112,7 +112,7 @@ func _on_first_scan_button_pressed() -> void:
 		"command": "first-scan",
 		"params": {
 			"value": int(scan_value.text),
-			"scan_size": scan_size.get_selected_id(),
+			"data_type": data_type.get_selected_id(),
 			"scan_type": scan_type.get_selected_id()
 		}
 	})
@@ -122,7 +122,7 @@ func _on_second_scan_button_pressed() -> void:
 		"command": "next-scan",
 		"params": {
 			"value": int(scan_value.text),
-			"scan_size": scan_size.get_selected_id(),
+			"data_type": data_type.get_selected_id(),
 			"scan_type": scan_type.get_selected_id()
 		}
 	})
