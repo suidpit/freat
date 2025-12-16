@@ -52,9 +52,9 @@ export function readValue(
 }
 
 export function readBatch(
-  addresses: [number, DataType][],
-): { [key: number]: any } {
-  const results: { [key: number]: any } = {};
+  addresses: [string, DataType][],
+): { [key: string]: any } {
+  const results: { [key: string]: any } = {};
   for (const [address, dataType] of addresses) {
     try {
       results[address] = readValue(ptr(address), dataType);
@@ -66,7 +66,7 @@ export function readBatch(
 }
 
 export function writeBatch(
-  writes: [number, any, DataType][],
+  writes: [string, any, DataType][],
 ): void {
   for (const [address, value, dataType] of writes) {
     try {

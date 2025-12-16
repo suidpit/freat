@@ -138,7 +138,7 @@ export function undoScan() {
 }
 
 export function getScanResults(maxResults: number = 100): {
-  address: number;
+  address: string;
   value: number | UInt64;
 }[] {
   const results = [];
@@ -148,7 +148,7 @@ export function getScanResults(maxResults: number = 100): {
       const address = ptr.add(i * Process.pointerSize).readPointer();
       const value = readValue(address, currentDataType);
       results.push({
-        address: address.toUInt32(),
+        address: address.toString(),
         value: value,
       });
       addedResults++;
@@ -188,7 +188,7 @@ export function runScanTest(): boolean {
     return false;
   }
   const scanResults = getScanResults();
-  if (range.base.toUInt32() != scanResults[0].address) {
+  if (range.base.toString() != scanResults[0].address) {
     console.error("Scan failed: expected result not found in scan results");
     return false;
   }

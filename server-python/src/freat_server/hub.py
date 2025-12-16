@@ -9,13 +9,13 @@ from frida.core import Script, ScriptExportsAsync
 from typing import Any, Awaitable, Protocol
 
 class DataType(Enum):
-    U8 = "u8"
-    U16 = "u16"
-    U32 = "u32"
-    U64 = "u64"
-    FLOAT = "float"
-    DOUBLE = "double"
-    STRING = "string"
+    U8 = 0
+    U16 = 1
+    U32 = 2
+    U64 = 3
+    FLOAT = 4
+    DOUBLE = 5
+    STRING = 6
 
 class ScanType(Enum):
     EXACT = 0
@@ -31,8 +31,9 @@ class Agent(Protocol):
     def next_scan(self, value: int, scan_type: int) -> Awaitable[int]: ...
     def undo_scan(self) -> Awaitable[None]: ...
     def get_scan_results(self, count: int) -> Awaitable[dict[str, int]]: ...
-    def read_batch(self, addresses: list[tuple[int, str]]) -> Awaitable[dict[int, Any]]: ...
-    def write_batch(self, writes: list[tuple[int, Any, str]]) -> Awaitable[None]: ...
+    def read_batch(self, addresses: list[tuple[str, str]]) -> Awaitable[dict[str, Any]]: ...
+    def write_batch(self, writes: list[tuple[str, Any, str]]) -> Awaitable[None]: ...
+    def write_value(self, ptr: str, value: Any, data_type: DataType) -> Awaitable[None]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
 
 class Hub:
@@ -208,6 +209,8 @@ class Hub:
                         self.freeze_list.append((params["address"], params["value"], params["data_type"]))
                     case "remove-from-freeze-list":
                         self.freeze_list = [(addr, val, dt) for addr, val, dt in self.freeze_list if addr != params["address"]]
+                    case "write-value":
+                        response = await self.agent.write_value(params["address"], params["value"], params["data_type"])
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:

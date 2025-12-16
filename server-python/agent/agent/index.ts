@@ -8,7 +8,7 @@ import {
   getScanResults,
   runScanTest,
 } from "./scan.js";
-import { readBatch, writeBatch } from "./memory.js";
+import { readBatch, writeBatch, writeValue } from "./memory.js";
 
 rpc.exports = {
   hello: (): string => {
@@ -27,7 +27,7 @@ rpc.exports = {
   },
   getScanResults: (
     count: number,
-  ): { address: number; value: number | UInt64 }[] => {
+  ): { address: string; value: number | UInt64 }[] => {
     return getScanResults(count);
   },
   undoScan: () => {
@@ -36,10 +36,13 @@ rpc.exports = {
   runScanTest: (): boolean => {
     return runScanTest();
   },
-  readBatch: (addresses: [number, DataType][]): { [key: number]: any } => {
+  readBatch: (addresses: [string, DataType][]): { [key: string]: any } => {
     return readBatch(addresses);
   },
-  writeBatch: (writes: [number, any, DataType][]): void => {
+  writeBatch: (writes: [string, any, DataType][]): void => {
     return writeBatch(writes);
+  },
+  writeValue: (address: string, value: any, dataType: DataType): void => {
+    return writeValue(ptr(address), value, dataType);
   },
 };

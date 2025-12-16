@@ -10,11 +10,13 @@ extends Control
 @onready var second_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/SecondScanButton
 @onready var undo_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/UndoScanButton
 @onready var search_process: LineEdit = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/SearchProcess
+@onready var write_address_dialog: AcceptDialog = $UI/Hub/WriteAddressDialog
 
 var connected = false
 var attached = false
 var is_scan = false
 var process_list_items: Array = []
+var write_target_address: String = ""
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -58,7 +60,7 @@ func _filter_process_list(new_text: String) -> void:
 func populate_scan_results(data: Array) -> void:
 	address_list.clear()
 	for scan_result in data:
-		address_list.add_item("0x%x (%d)" % [scan_result.address, scan_result.value])
+		address_list.add_item("%s (%d)" % [scan_result.address, scan_result.value])
 
 
 func _on_process_activated(index: int):
@@ -91,13 +93,11 @@ func _on_message(data: Dictionary) -> void:
 			pick_process.hide()
 			hub.show()
 		"current-scan-results":
-			print("Getting scan results :)")
 			populate_scan_results(payload)
 			if not is_scan:
 				is_scan = true
 				_switch_scan_controls(true)
 		"status":
-			print("Status: %s" % payload)
 			if payload == "attached":
 				attached = true
 				hub.show()
@@ -131,3 +131,24 @@ func _on_undo_scan_button_pressed() -> void:
 	RPCManager.send_message({"command": "undo-scan"})
 	is_scan = false
 	_switch_scan_controls(false)
+
+
+func _on_address_list_item_activated(index: int) -> void:
+	var item := address_list.get_item_text(index)
+	var address_str := item.split(" ")[0]  # Get "0x128898000" part (as string)
+	print("Selected write address: %s from item %s" % [address_str, item])
+	write_target_address = address_str  # Keep as string
+	write_address_dialog.popup_centered()
+
+
+func _on_write_address_dialog_confirmed() -> void:
+	var write_input = int(write_address_dialog.find_child("WriteValue", true, false).text)
+	print("Writing value: %d to address: 0x%x" % [write_input, write_target_address])  # Debug output
+	RPCManager.send_message({
+		"command": "write-value",
+		"params": {
+			"address": write_target_address,
+			"value": write_input,
+			"data_type": data_type.get_selected_id()
+		}
+	})
