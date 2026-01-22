@@ -7,13 +7,57 @@ Freat is a tool that allows you to attach to arbitrary programs running on your 
 
 In its current state, it supports CheatEngine-like features like memory scanning, freezing and writing.
 
+## Features
+
+- **Memory scanning**: scan the entire address space for values, then refine results with subsequent scans
+- **Scan types**: exact match, greater than, less than
+- **Data types**: U8, U16, U32, U64, float, double
+- **Watch list**: monitor addresses in real-time
+- **Freeze list**: lock addresses to specific values
+- **Write values**: directly modify memory
+
+### Target providers
+
+- **Local**: attach to processes on your machine
+- **Remote**: connect to a frida-server over the network
+- **Wine** (experimental): attach to Windows programs running under Wine
+
 ## Architecture
 
 Freat is made of the following components:
 
-- Agent: developed in frida, it is injected in the target process to implement the dynamic instrumentation (e.g. memory scanning). The languages used are TypeScript, for the less intensive operations, and C, for heavy operations such as wide address space scanning.
-- Hub: a Python program that manages agent creation and interaction. It exposes a WebSocket RPC API to implement the commands.
-- GUI: the tool UI implemented in Godot. It connects to the Hub to send commands and receive updates.
+- **Agent**: developed in frida, it is injected in the target process to implement the dynamic instrumentation (e.g. memory scanning). The languages used are TypeScript, for the less intensive operations, and C, for heavy operations such as wide address space scanning.
+- **Hub**: a Python program that manages agent creation and interaction. It exposes a WebSocket RPC API to implement the commands.
+- **GUI**: the tool UI implemented in Godot. It connects to the Hub to send commands and receive updates.
+
+## Configuration
+
+Freat looks for a config file at `~/.config/freat/config.toml` (Linux). Examples:
+
+```toml
+# Local (default)
+[target]
+provider = "local"
+```
+
+```toml
+# Remote
+[target]
+provider = "remote"
+
+[target.options]
+host = "192.168.1.100"
+port = 27042
+```
+
+```toml
+# Wine
+[target]
+provider = "wine"
+
+[target.options]
+wine_prefix = "/home/user/.wine"
+```
 
 ## Installation
 
