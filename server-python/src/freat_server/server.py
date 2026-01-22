@@ -1,11 +1,16 @@
 import asyncio
 import functools
+import logging
 
 import websockets
 
 from freat_server.hub import Hub
 
 APP_NAME = "freat"
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
 
 
 async def websocket_handler(websocket, hub: Hub):
@@ -30,6 +35,7 @@ async def serve():
     print("Starting WebSocket server on ws://localhost:8765")
     async with websockets.serve(ws_handler, "localhost", 8765):
         await asyncio.Future()
+
 
 def main():
     asyncio.run(serve())

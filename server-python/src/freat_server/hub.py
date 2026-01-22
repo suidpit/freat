@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Protocol
 
 import frida
 
-from freat_server.targets.remote import RemoteTargetProvider
+from freat_server.targets.wine import WineTargetProvider
 
 
 class DataType(Enum):
@@ -57,10 +57,10 @@ class Hub:
     def __init__(self, user_config: dict = {}):
         self.session = None
         self.agent: Agent | None = None
-        self.target_provider = RemoteTargetProvider(
-            user_config.get("remote_host", "localhost"),
-            user_config.get("remote_port", 27042),
+        self.target_provider = WineTargetProvider(
+            wine_prefix="/home/pit/wine-freat-prefix"
         )
+
         self.clients = set()
         self.watch_list: set[tuple[str, str]] = set()
         self.freeze_list: list[tuple[str, Any, str]] = []
