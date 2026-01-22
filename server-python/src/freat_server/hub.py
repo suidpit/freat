@@ -108,6 +108,18 @@ class Hub:
             *[client.send(json.dumps(message)) for client in self.clients]
         )
 
+    def _on_agent_message(self, message, data):
+        """Handles messages sent from the Frida agent via send()."""
+        if message["type"] == "send" and message.get("payload"):
+            payload = message["payload"]
+            if payload.get("type") == "scan-progress":
+                asyncio.run_coroutine_threadsafe(
+                    self.broadcast({"event": "scan-progress", "data": payload}),
+                    self.loop,
+                )
+        else:
+            print(f"Agent message: {message} {data}")
+
     # Core Frida Logic
 
     async def attach(self, pid: int):
@@ -126,7 +138,7 @@ class Hub:
             self.session.on("detached", lambda reason: self.detach_sync(reason))
 
             script = self.session.create_script(self.agent_js)
-            script.on("message", lambda message, data: print(message, data))
+            script.on("message", self._on_agent_message)
             script.load()
             self.agent = typing.cast(Agent, script.exports_async)
             self.polling_task = asyncio.create_task(self._poll_loop())

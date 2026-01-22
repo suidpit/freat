@@ -71,9 +71,11 @@ export function firstScan(
   currentScanResults = [];
   currentDataType = dataType;
   const ranges = Process.enumerateRanges("rw-");
+  const totalRegions = ranges.length;
   writeValue(valuePtr, value, dataType);
   log(`value written at ${valuePtr}: ${valuePtr.readU32()}`);
-  for (const range of ranges) {
+  for (let i = 0; i < ranges.length; i++) {
+    const range = ranges[i];
     try {
       const resultsPtr = scan_region(
         range.base,
@@ -96,6 +98,7 @@ export function firstScan(
         `Error scanning range ${range.base} - ${range.base.add(range.size)}: ${error}`,
       );
     }
+    send({ type: "scan-progress", current: i + 1, total: totalRegions });
   }
   return getCount();
 }
@@ -107,7 +110,9 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
     return 0;
   }
   const newResults = [];
-  for (const { ptr, count } of currentScanResults) {
+  const totalResultSets = currentScanResults.length;
+  for (let i = 0; i < currentScanResults.length; i++) {
+    const { ptr, count } = currentScanResults[i];
     try {
       writeValue(valuePtr, value, currentDataType);
       const newResultsPtr = filter_scans(
@@ -128,6 +133,7 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
     } catch (error) {
       console.error(`Error filtering results in ${ptr} (#${count})`, error);
     }
+    send({ type: "scan-progress", current: i + 1, total: totalResultSets });
   }
   currentScanResults = newResults;
   return getCount();
@@ -261,9 +267,9 @@ export function runScanTest(): boolean {
   }
 
   // Test 9: GREATER_THAN with negative-like values (U32 overflow edge case)
-  range.base.writeU32(0xFFFFFFFF); // Max U32
-  range.base.add(4).writeU32(0xFFFFFFFE);
-  firstScan(0xFFFFFFFE, DataType.U32, ScanType.GREATER_THAN);
+  range.base.writeU32(0xffffffff); // Max U32
+  range.base.add(4).writeU32(0xfffffffe);
+  firstScan(0xfffffffe, DataType.U32, ScanType.GREATER_THAN);
   if (!checkAddrInResults(range.base)) {
     console.error("Test 9 failed: 0xFFFFFFFF should be > 0xFFFFFFFE");
     return false;

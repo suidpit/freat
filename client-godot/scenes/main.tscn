@@ -166,6 +166,16 @@ layout_mode = 2
 disabled = true
 text = "Undo Scan"
 
+[node name="HSeparatorControl5" type="Control" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="ScanProgressBar" type="ProgressBar" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
+visible = false
+layout_mode = 2
+value = 0.0
+show_percentage = false
+
 [node name="Table" type="PanelContainer" parent="UI/Hub"]
 layout_mode = 2
 

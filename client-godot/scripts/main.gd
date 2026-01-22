@@ -11,6 +11,7 @@ extends Control
 @onready var undo_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/UndoScanButton
 @onready var search_process: LineEdit = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/SearchProcess
 @onready var write_address_dialog: AcceptDialog = $UI/Hub/WriteAddressDialog
+@onready var scan_progress_bar: ProgressBar = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/ScanProgressBar
 
 var connected = false
 var attached = false
@@ -97,6 +98,11 @@ func _on_message(data: Dictionary) -> void:
 			if not is_scan:
 				is_scan = true
 				_switch_scan_controls(true)
+		"scan-progress":
+			scan_progress_bar.visible = true
+			scan_progress_bar.value = float(payload.current) / float(payload.total) * 100.0
+			if payload.current == payload.total:
+				scan_progress_bar.visible = false
 		"status":
 			if payload == "attached":
 				attached = true
