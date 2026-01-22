@@ -1,9 +1,8 @@
 import argparse
 import atexit
-import os
 import shutil
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 processes: list[subprocess.Popen] = []
@@ -79,6 +78,7 @@ def cmd_dev():
         except KeyboardInterrupt:
             print("Stopping all services...")
 
+
 def cmd_test():
     """Run the test suite"""
     print("--- Building Agent ---")
@@ -149,6 +149,7 @@ def cmd_build():
     pyproject = Path(HUB_DIR) / "pyproject.toml"
     if pyproject.exists():
         import re
+
         content = pyproject.read_text()
         match = re.search(r'version\s*=\s*"([^"]+)"', content)
         if match:
@@ -180,6 +181,7 @@ def cmd_build():
     print("   2. Start server: freat-server")
     print("   3. Launch GUI from DMG")
     print()
+
 
 def main():
     parser = argparse.ArgumentParser(description="freat - an instrumentation toolkit")
