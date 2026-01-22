@@ -7,6 +7,9 @@ from typing import Any, Awaitable, Protocol
 
 import frida
 
+from freat_server.config import TargetConfig
+from freat_server.targets.local import LocalTargetProvider
+from freat_server.targets.remote import RemoteTargetProvider
 from freat_server.targets.wine import WineTargetProvider
 
 
@@ -54,18 +57,25 @@ class Hub:
     and all the connected UI clients.
     """
 
-    def __init__(self, user_config: dict = {}):
+    def __init__(self, target_config: TargetConfig):
         self.session = None
         self.agent: Agent | None = None
-        self.target_provider = WineTargetProvider(
-            wine_prefix="/home/pit/wine-freat-prefix"
-        )
+        if target_config.provider == "local":
+            self.target_provider = LocalTargetProvider()
+        elif target_config.provider == "wine":
+            self.target_provider = WineTargetProvider(
+                wine_prefix=target_config.options["wine_prefix"]
+            )
+        elif target_config.provider == "remote":
+            self.target_provider = RemoteTargetProvider(
+                remote_host=target_config.options["host"],
+                remote_port=target_config.options["port"],
+            )
 
         self.clients = set()
         self.watch_list: set[tuple[str, str]] = set()
         self.freeze_list: list[tuple[str, Any, str]] = []
         self.polling_task: asyncio.Task | None = None
-        self.user_config = user_config
         self.agent_js = self._load_agent_script()
         self.loop = asyncio.get_event_loop()
         self.top_results_count = 100

@@ -4,6 +4,7 @@ import logging
 
 import websockets
 
+from freat_server.config import load_config
 from freat_server.hub import Hub
 
 APP_NAME = "freat"
@@ -29,7 +30,8 @@ async def websocket_handler(websocket, hub: Hub):
 
 
 async def serve():
-    hub = Hub()
+    config = load_config()
+    hub = Hub(config.target)
     ws_handler = functools.partial(websocket_handler, hub=hub)
 
     print("Starting WebSocket server on ws://localhost:8765")

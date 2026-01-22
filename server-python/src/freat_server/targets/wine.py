@@ -39,6 +39,12 @@ class WineTargetProvider:
         )
         logger.info("WineTargetProvider initialized successfully")
 
+    def __del__(self):
+        logger.info("WineTargetProvider is being destroyed")
+        if self.server_process:
+            self.server_process.terminate()
+            self.server_process.wait()
+
     def download_file(self, url: str, path: Path):
         logger.info(f"Downloading {url}")
         urlretrieve(url, path)
@@ -50,7 +56,7 @@ class WineTargetProvider:
         logger.debug(f"Extracted to {self.server_path}")
 
     def _get_data_dir(self) -> Path:
-        path = Path(platformdirs.user_data_dir("freat-server"))
+        path = Path(platformdirs.user_data_dir("freat"))
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -68,6 +74,8 @@ class WineTargetProvider:
         logger.info(f"Starting frida-server on port {self.server_port}")
         self.server_process = subprocess.Popen(
             f"wine {self.server_path} --listen 127.0.0.1:{self.server_port}".split(" "),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             env={"WINEPREFIX": self.wine_prefix},
         )
         return_code = self.server_process.poll()

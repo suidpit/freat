@@ -5,13 +5,16 @@ import pytest
 import pytest_asyncio
 from pytest_mock import MockFixture
 
+from freat_server.config import TargetConfig
 from freat_server.hub import Hub
+
+test_config = TargetConfig()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_hub():
     idle_proc = subprocess.Popen(["cat"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    hub = Hub()
+    hub = Hub(test_config)
     await hub.attach(idle_proc.pid)
     yield hub
     idle_proc.kill()
