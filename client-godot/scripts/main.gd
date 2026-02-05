@@ -18,6 +18,7 @@ var attached = false
 var is_scan = false
 var process_list_items: Array = []
 var write_target_address: String = ""
+var process_list_timer: Timer
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -30,6 +31,12 @@ func _ready() -> void:
 	undo_scan_button.pressed.connect(_on_undo_scan_button_pressed)
 	search_process.text_changed.connect(_filter_process_list)
 	scan_type.item_selected.connect(_on_scan_type_selected)
+
+	process_list_timer = Timer.new()
+	process_list_timer.wait_time = 2.0
+	process_list_timer.one_shot = false
+	process_list_timer.timeout.connect(_on_process_list_timer_timeout)
+	add_child(process_list_timer)
 
 	hub.hide()
 	pick_process.show()
@@ -85,6 +92,10 @@ func _on_connected() -> void:
 	print("CONNECTED!")
 	connected = true
 	RPCManager.send_message({"command": "list-processes"})
+	process_list_timer.start()
+
+func _on_process_list_timer_timeout() -> void:
+	RPCManager.send_message({"command": "list-processes"})
 
 func _on_disconnected() -> void:
 	print("Disconnected from the WS.")
@@ -102,6 +113,7 @@ func _on_message(data: Dictionary) -> void:
 			populate_process_list(payload)
 		"attach":
 			print("Successfully attached to %d!" % payload)
+			process_list_timer.stop()
 			pick_process.hide()
 			hub.show()
 		"current-scan-results":
@@ -117,10 +129,12 @@ func _on_message(data: Dictionary) -> void:
 		"status":
 			if payload == "attached":
 				attached = true
+				process_list_timer.stop()
 				hub.show()
 				pick_process.hide()
 			else:
 				attached = false
+				process_list_timer.start()
 				hub.hide()
 				pick_process.show()
 

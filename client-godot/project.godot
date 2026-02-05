@@ -25,11 +25,9 @@ RPCManager="*res://scripts/RPCManager.gd"
 
 [display]
 
-window/size/viewport_width=1400
-window/size/viewport_height=800
+window/size/mode=2
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/dpi/allow_hidpi=false
 
 [rendering]
 
