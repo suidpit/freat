@@ -216,7 +216,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 .DS_Store
-.clangd
 *_agent.js
 
 *.dmg
