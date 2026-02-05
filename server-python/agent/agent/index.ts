@@ -27,7 +27,7 @@ rpc.exports = {
   },
   getScanResults: (
     count: number,
-  ): { address: string; value: number | UInt64 }[] => {
+  ): { address: string; value: number | UInt64; previousValue: number | UInt64 }[] => {
     return getScanResults(count);
   },
   undoScan: () => {

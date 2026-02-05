@@ -29,6 +29,7 @@ func _ready() -> void:
 	second_scan_button.pressed.connect(_on_second_scan_button_pressed)
 	undo_scan_button.pressed.connect(_on_undo_scan_button_pressed)
 	search_process.text_changed.connect(_filter_process_list)
+	scan_type.item_selected.connect(_on_scan_type_selected)
 
 	hub.hide()
 	pick_process.show()
@@ -58,10 +59,20 @@ func _filter_process_list(new_text: String) -> void:
 			filtered_processes.append(proc)
 	populate_process_list(filtered_processes)
 
+func _is_relative_scan_type(id: int) -> bool:
+	return id == 3 or id == 4  # INCREASED or DECREASED
+
+func _on_scan_type_selected(_index: int) -> void:
+	var selected_id = scan_type.get_selected_id()
+	scan_value.editable = not _is_relative_scan_type(selected_id)
+
 func populate_scan_results(data: Array) -> void:
 	address_list.clear()
 	for scan_result in data:
-		address_list.add_item("%s (%d)" % [scan_result.address, scan_result.value])
+		var prev_val = scan_result.get("previousValue", scan_result.value)
+		var idx = address_list.add_item("%s  prev: %s  cur: %s" % [scan_result.address, str(prev_val), str(scan_result.value)])
+		if scan_result.value != prev_val:
+			address_list.set_item_custom_fg_color(idx, Color.RED)
 
 
 func _on_process_activated(index: int):
@@ -114,22 +125,27 @@ func _on_message(data: Dictionary) -> void:
 				pick_process.show()
 
 func _on_first_scan_button_pressed() -> void:
+	var selected_scan_type = scan_type.get_selected_id()
+	if _is_relative_scan_type(selected_scan_type):
+		return
 	RPCManager.send_message({
 		"command": "first-scan",
 		"params": {
 			"value": int(scan_value.text),
 			"data_type": data_type.get_selected_id(),
-			"scan_type": scan_type.get_selected_id()
+			"scan_type": selected_scan_type
 		}
 	})
 
 func _on_second_scan_button_pressed() -> void:
+	var selected_scan_type = scan_type.get_selected_id()
+	var value = 0 if _is_relative_scan_type(selected_scan_type) else int(scan_value.text)
 	RPCManager.send_message({
 		"command": "next-scan",
 		"params": {
-			"value": int(scan_value.text),
+			"value": value,
 			"data_type": data_type.get_selected_id(),
-			"scan_type": scan_type.get_selected_id()
+			"scan_type": selected_scan_type
 		}
 	})
 

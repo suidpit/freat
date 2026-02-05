@@ -6,6 +6,8 @@ export enum ScanType {
   EXACT,
   LESS_THAN,
   GREATER_THAN,
+  INCREASED,
+  DECREASED,
 }
 
 // C code expects integer enums for ScanSize, so we convert DataType strings to integers
@@ -18,7 +20,11 @@ const onMessageCallback = new NativeCallback(
   ["pointer"],
 );
 
-let currentScanResults: { ptr: NativePointer; count: number }[] = [];
+let currentScanResults: {
+  ptr: NativePointer;
+  count: number;
+  valuesPtr: NativePointer;
+}[] = [];
 let currentDataType: DataType = DataType.U32;
 const cScannerCode: string = "__C_MODULE_PLACEHOLDER__";
 (globalThis as any).cm = new CModule(cScannerCode, {
@@ -26,20 +32,23 @@ const cScannerCode: string = "__C_MODULE_PLACEHOLDER__";
 });
 const cm = (globalThis as any).cm;
 const scan_region = new NativeFunction(cm.scan_region, "pointer", [
-  "pointer",
-  "uint",
-  "uint",
-  "uint",
-  "pointer",
-  "pointer",
+  "pointer", // base_addr
+  "uint", // region_size
+  "uint", // scan_type
+  "uint", // scan_size
+  "pointer", // value_ptr
+  "pointer", // out_count
+  "pointer", // out_values_ptr
 ]);
 const filter_scans = new NativeFunction(cm.filter_scans, "pointer", [
-  "pointer",
-  "uint",
-  "uint",
-  "uint",
-  "pointer",
-  "pointer",
+  "pointer", // prev_results
+  "uint", // prev_count
+  "uint", // scan_type
+  "uint", // scan_size
+  "pointer", // value_ptr
+  "pointer", // prev_values
+  "pointer", // out_count
+  "pointer", // out_values_ptr
 ]);
 const find_address_in_results = new NativeFunction(
   cm.find_address_in_results,
@@ -49,7 +58,27 @@ const find_address_in_results = new NativeFunction(
 const free_results = new NativeFunction(cm.free_results, "void", ["pointer"]);
 
 const outCountPtr = Memory.alloc(Process.pointerSize);
+const outValuesPtrPtr = Memory.alloc(Process.pointerSize);
 const valuePtr = Memory.alloc(8);
+
+function dataTypeByteSize(dt: DataType): number {
+  switch (dt) {
+    case DataType.U8:
+      return 1;
+    case DataType.U16:
+      return 2;
+    case DataType.U32:
+      return 4;
+    case DataType.U64:
+      return 8;
+    case DataType.FLOAT:
+      return 4;
+    case DataType.DOUBLE:
+      return 8;
+    default:
+      return 4;
+  }
+}
 
 export function getCount(): number {
   return currentScanResults.reduce((acc, { count }) => acc + count, 0);
@@ -84,14 +113,17 @@ export function firstScan(
         dataType,
         valuePtr,
         outCountPtr,
+        outValuesPtrPtr,
       );
 
       const count = outCountPtr.readU64().toNumber();
+      const valuesPtr = outValuesPtrPtr.readPointer();
 
       if (count > 0 && !resultsPtr.isNull()) {
-        currentScanResults.push({ ptr: resultsPtr, count });
+        currentScanResults.push({ ptr: resultsPtr, count, valuesPtr });
       } else {
         free_results(resultsPtr);
+        free_results(valuesPtr);
       }
     } catch (error) {
       console.error(
@@ -109,10 +141,10 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
     console.warn("No previous scan results found");
     return 0;
   }
-  const newResults = [];
+  const newResults: { ptr: NativePointer; count: number; valuesPtr: NativePointer }[] = [];
   const totalResultSets = currentScanResults.length;
   for (let i = 0; i < currentScanResults.length; i++) {
-    const { ptr, count } = currentScanResults[i];
+    const { ptr, count, valuesPtr } = currentScanResults[i];
     try {
       writeValue(valuePtr, value, currentDataType);
       const newResultsPtr = filter_scans(
@@ -121,14 +153,19 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
         scanType,
         currentDataType,
         valuePtr,
+        valuesPtr,
         outCountPtr,
+        outValuesPtrPtr,
       );
       const newCount = outCountPtr.readU64().toNumber();
+      const newValuesPtr = outValuesPtrPtr.readPointer();
       free_results(ptr);
+      free_results(valuesPtr);
       if (newCount > 0 && !newResultsPtr.isNull()) {
-        newResults.push({ ptr: newResultsPtr, count: newCount });
+        newResults.push({ ptr: newResultsPtr, count: newCount, valuesPtr: newValuesPtr });
       } else {
         free_results(newResultsPtr);
+        free_results(newValuesPtr);
       }
     } catch (error) {
       console.error(`Error filtering results in ${ptr} (#${count})`, error);
@@ -146,16 +183,20 @@ export function undoScan() {
 export function getScanResults(maxResults: number = 100): {
   address: string;
   value: number | UInt64;
+  previousValue: number | UInt64;
 }[] {
-  const results = [];
+  const results: { address: string; value: number | UInt64; previousValue: number | UInt64 }[] = [];
   let addedResults = 0;
-  for (const { ptr, count } of currentScanResults) {
+  const elemSize = dataTypeByteSize(currentDataType);
+  for (const { ptr, count, valuesPtr } of currentScanResults) {
     for (let i = 0; i < count; i++) {
       const address = ptr.add(i * Process.pointerSize).readPointer();
       const value = readValue(address, currentDataType);
+      const previousValue = readValue(valuesPtr.add(i * elemSize), currentDataType);
       results.push({
         address: address.toString(),
-        value: value,
+        value,
+        previousValue,
       });
       addedResults++;
       if (addedResults >= maxResults) {
@@ -276,6 +317,51 @@ export function runScanTest(): boolean {
   }
   if (checkAddrInResults(range.base.add(4))) {
     console.error("Test 9 failed: 0xFFFFFFFE should NOT be > 0xFFFFFFFE");
+    return false;
+  }
+
+  // Test 10: INCREASED scan
+  range.base.writeU32(100);
+  range.base.add(4).writeU32(200);
+  range.base.add(8).writeU32(300);
+  firstScan(0, DataType.U32, ScanType.GREATER_THAN); // baseline: captures values 100, 200, 300
+  // Now increase some values
+  range.base.writeU32(150);       // 100 -> 150 (increased)
+  range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
+  range.base.add(8).writeU32(250); // 300 -> 250 (decreased)
+  nextScan(0, ScanType.INCREASED);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 10 failed: value 100->150 should be INCREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 10 failed: value 200->200 should NOT be INCREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(8))) {
+    console.error("Test 10 failed: value 300->250 should NOT be INCREASED");
+    return false;
+  }
+
+  // Test 11: DECREASED scan
+  range.base.writeU32(100);
+  range.base.add(4).writeU32(200);
+  range.base.add(8).writeU32(300);
+  firstScan(0, DataType.U32, ScanType.GREATER_THAN); // baseline
+  range.base.writeU32(50);        // 100 -> 50 (decreased)
+  range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
+  range.base.add(8).writeU32(350); // 300 -> 350 (increased)
+  nextScan(0, ScanType.DECREASED);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 11 failed: value 100->50 should be DECREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 11 failed: value 200->200 should NOT be DECREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(8))) {
+    console.error("Test 11 failed: value 300->350 should NOT be DECREASED");
     return false;
   }
 

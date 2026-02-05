@@ -27,6 +27,8 @@ class ScanType(Enum):
     EXACT = 0
     GREATER_THAN = 1
     LESS_THAN = 2
+    INCREASED = 3
+    DECREASED = 4
 
 
 class Agent(Protocol):

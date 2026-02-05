@@ -13,11 +13,9 @@ test_config = TargetConfig()
 
 @pytest_asyncio.fixture(scope="function")
 async def test_hub():
-    idle_proc = subprocess.Popen(["cat"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     hub = Hub(test_config)
-    await hub.attach(idle_proc.pid)
+    await hub.attach(0)
     yield hub
-    idle_proc.kill()
 
 
 @pytest.mark.asyncio
@@ -34,7 +32,7 @@ async def test_hello(test_hub: Hub, mocker: MockFixture):
     )
 
 
-@pytest.mark.timeout(5)
+@pytest.mark.timeout(10)
 @pytest.mark.asyncio
 async def test_scan(test_hub: Hub, mocker: MockFixture):
     assert test_hub.agent

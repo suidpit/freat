@@ -110,13 +110,17 @@ horizontal_alignment = 2
 [node name="ScanType" type="OptionButton" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
 layout_mode = 2
 selected = 0
-item_count = 3
+item_count = 5
 popup/item_0/text = "Exact Scan"
 popup/item_0/id = 0
 popup/item_1/text = "Greater Than"
 popup/item_1/id = 1
 popup/item_2/text = "Less Than"
 popup/item_2/id = 2
+popup/item_3/text = "Increased"
+popup/item_3/id = 3
+popup/item_4/text = "Decreased"
+popup/item_4/id = 4
 
 [node name="DataTypeLabel" type="Label" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer"]
 layout_mode = 2
