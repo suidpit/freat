@@ -2,7 +2,7 @@ extends Control
 @onready var process_list: ItemList = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/ProcessList
 @onready var pick_process: PanelContainer = $UI/PickProcess
 @onready var hub: VBoxContainer = $UI/Hub
-@onready var address_list: ItemList = $UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScrollContainer/AddressList
+@onready var scan_results_tree: Tree = $UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScanResultsTree
 @onready var first_scan_button: Button = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/FirstScanButton
 @onready var scan_value: LineEdit = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/ScanValue
 @onready var scan_type: OptionButton = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/HBoxContainer/GridContainer/ScanType
@@ -12,6 +12,8 @@ extends Control
 @onready var search_process: LineEdit = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/SearchProcess
 @onready var write_address_dialog: AcceptDialog = $UI/Hub/WriteAddressDialog
 @onready var scan_progress_bar: ProgressBar = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/ScanProgressBar
+@onready var cheat_table: Tree = $UI/Hub/Table/MarginContainer/VBoxContainer/CheatTable
+@onready var cheat_table_context_menu: PopupMenu = $UI/Hub/CheatTableContextMenu
 
 var connected = false
 var attached = false
@@ -19,6 +21,8 @@ var is_scan = false
 var process_list_items: Array = []
 var write_target_address: String = ""
 var process_list_timer: Timer
+var selected_cheat_table_item: TreeItem = null
+var selected_scan_result: Dictionary = {}
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -29,8 +33,9 @@ func _ready() -> void:
 	first_scan_button.pressed.connect(_on_first_scan_button_pressed)
 	second_scan_button.pressed.connect(_on_second_scan_button_pressed)
 	undo_scan_button.pressed.connect(_on_undo_scan_button_pressed)
-	search_process.text_changed.connect(_filter_process_list)
+	search_process.text_changed.connect(_refresh_process_list)
 	scan_type.item_selected.connect(_on_scan_type_selected)
+	scan_results_tree.item_selected.connect(_on_scan_result_selected)
 
 	process_list_timer = Timer.new()
 	process_list_timer.wait_time = 2.0
@@ -41,6 +46,33 @@ func _ready() -> void:
 	hub.hide()
 	pick_process.show()
 	RPCManager.connect_to_server("ws://localhost:8765")
+
+	scan_results_tree.set_column_title(0, "Address")
+	scan_results_tree.set_column_title(1, "Previous")
+	scan_results_tree.set_column_title(2, "Current")
+	scan_results_tree.set_column_expand(0, true)
+	scan_results_tree.set_column_expand(1, true)
+	scan_results_tree.set_column_expand(2, true)
+	scan_results_tree.set_column_title_alignment(0, HORIZONTAL_ALIGNMENT_LEFT)
+	scan_results_tree.set_column_title_alignment(1, HORIZONTAL_ALIGNMENT_LEFT)
+	scan_results_tree.set_column_title_alignment(2, HORIZONTAL_ALIGNMENT_LEFT)
+	scan_results_tree.create_item()
+
+	cheat_table.set_column_title(0, "Address")
+	cheat_table.set_column_title(1, "Value")
+	cheat_table.set_column_title(2, "Type")
+	cheat_table.set_column_title(3, "Frozen")
+	cheat_table.set_column_expand(0, true)
+	cheat_table.set_column_expand(1, true)
+	cheat_table.set_column_expand(2, false)
+	cheat_table.set_column_expand(3, false)
+	cheat_table.set_column_custom_minimum_width(2, 60)
+	cheat_table.set_column_custom_minimum_width(3, 60)
+	cheat_table.set_column_title_alignment(0, HORIZONTAL_ALIGNMENT_LEFT)
+	cheat_table.set_column_title_alignment(1, HORIZONTAL_ALIGNMENT_LEFT)
+	cheat_table.set_column_title_alignment(2, HORIZONTAL_ALIGNMENT_LEFT)
+	cheat_table.set_column_title_alignment(3, HORIZONTAL_ALIGNMENT_LEFT)
+	cheat_table.create_item()
 
 
 func _process(_delta: float) -> void:
@@ -54,17 +86,15 @@ func _switch_scan_controls(status: bool) -> void:
 	undo_scan_button.disabled = !status
 
 func populate_process_list(data: Array) -> void:
-	process_list.clear()
+	process_list_items.clear()
 	for proc in data:
-		process_list.add_item("%s %s" % [int(proc.pid), proc.name])
+		process_list_items.append(proc)
 
-func _filter_process_list(new_text: String) -> void:
-	print("Filtering!")
-	var filtered_processes = []
+func _refresh_process_list(filter: String) -> void:
+	process_list.clear()
 	for proc in process_list_items:
-		if proc.name.containsn(new_text):
-			filtered_processes.append(proc)
-	populate_process_list(filtered_processes)
+		if not search_process.text or proc.name.containsn(filter):
+			process_list.add_item("%s %s" % [int(proc.pid), proc.name])
 
 func _is_relative_scan_type(id: int) -> bool:
 	return id == 3 or id == 4  # INCREASED or DECREASED
@@ -74,12 +104,21 @@ func _on_scan_type_selected(_index: int) -> void:
 	scan_value.editable = not _is_relative_scan_type(selected_id)
 
 func populate_scan_results(data: Array) -> void:
-	address_list.clear()
+	var root := scan_results_tree.get_root()
+	for child in root.get_children():
+		child.free()
+
 	for scan_result in data:
 		var prev_val = scan_result.get("previousValue", scan_result.value)
-		var idx = address_list.add_item("%s  prev: %s  cur: %s" % [scan_result.address, str(prev_val), str(scan_result.value)])
+		var item := scan_results_tree.create_item(root)
+		item.set_metadata(0, scan_result)
+		item.set_text(0, scan_result.address)
+		item.set_text(1, str(prev_val))
+		item.set_text(2, str(scan_result.value))
 		if scan_result.value != prev_val:
-			address_list.set_item_custom_fg_color(idx, Color.RED)
+			item.set_custom_color(0, Color.RED)
+			item.set_custom_color(1, Color.RED)
+			item.set_custom_color(2, Color.RED)
 
 
 func _on_process_activated(index: int):
@@ -109,8 +148,8 @@ func _on_message(data: Dictionary) -> void:
 
 	match event:
 		"list-processes":
-			process_list_items = payload
 			populate_process_list(payload)
+			_refresh_process_list(search_process.text)
 		"attach":
 			print("Successfully attached to %d!" % payload)
 			process_list_timer.stop()
@@ -134,9 +173,12 @@ func _on_message(data: Dictionary) -> void:
 				pick_process.hide()
 			else:
 				attached = false
-				process_list_timer.start()
+				if process_list_timer.is_stopped():
+					process_list_timer.start()
 				hub.hide()
 				pick_process.show()
+		"watch":
+			_update_cheat_table_values(payload)
 
 func _on_first_scan_button_pressed() -> void:
 	var selected_scan_type = scan_type.get_selected_id()
@@ -169,17 +211,170 @@ func _on_undo_scan_button_pressed() -> void:
 	_switch_scan_controls(false)
 
 
-func _on_address_list_item_activated(index: int) -> void:
-	var item := address_list.get_item_text(index)
-	var address_str := item.split(" ")[0]  # Get "0x128898000" part (as string)
-	print("Selected write address: %s from item %s" % [address_str, item])
-	write_target_address = address_str  # Keep as string
-	write_address_dialog.popup_centered()
+func _on_scan_result_selected() -> void:
+	var item = scan_results_tree.get_selected()
+	if item:
+		selected_scan_result = item.get_metadata(0)
+
+func _on_scan_results_item_activated() -> void:
+	if selected_scan_result.is_empty():
+		return
+
+	var address_str: String = selected_scan_result.address
+	var current_data_type := data_type.get_selected_id()
+
+	if _find_cheat_table_item(address_str):
+		return
+
+	var new_entry := {
+		"address": address_str,
+		"data_type": current_data_type,
+		"value": selected_scan_result.value,
+		"frozen": false
+	}
+
+	RPCManager.send_message({
+		"command": "add-to-watch-list",
+		"params": {"address": address_str, "data_type": current_data_type}
+	})
+
+	_add_cheat_table_row(new_entry)
+
+
+func _on_cheat_table_right_click(position: Vector2, mouse_button_index: int) -> void:
+	if mouse_button_index != MOUSE_BUTTON_RIGHT:
+		return
+	selected_cheat_table_item = cheat_table.get_selected()
+	if selected_cheat_table_item:
+		cheat_table_context_menu.popup(Rect2i(get_global_mouse_position(), Vector2i.ZERO))
+
+
+func _on_context_menu_item_selected(id: int) -> void:
+	if not selected_cheat_table_item:
+		return
+
+	var entry: Dictionary = selected_cheat_table_item.get_metadata(0)
+
+	match id:
+		0:  # Write Value
+			write_target_address = entry.address
+			write_address_dialog.popup_centered()
+		1:  # Remove
+			_remove_from_cheat_table(selected_cheat_table_item)
+
+
+func _on_cheat_table_item_edited() -> void:
+	var edited_item := cheat_table.get_edited()
+	var column := cheat_table.get_edited_column()
+
+	if column == 3:  # Frozen checkbox column
+		var entry: Dictionary = edited_item.get_metadata(0)
+		var new_state := edited_item.is_checked(3)
+		if new_state != entry.frozen:
+			_toggle_freeze(edited_item)
+
+
+func _toggle_freeze(item: TreeItem) -> void:
+	var entry: Dictionary = item.get_metadata(0)
+	entry.frozen = not entry.frozen
+
+	if entry.frozen:
+		RPCManager.send_message({
+			"command": "add-to-freeze-list",
+			"params": {
+				"address": entry.address,
+				"value": entry.value,
+				"data_type": entry.data_type
+			}
+		})
+	else:
+		RPCManager.send_message({
+			"command": "remove-from-freeze-list",
+			"params": {"address": entry.address}
+		})
+
+	_update_cheat_table_item(item)
+
+
+func _remove_from_cheat_table(item: TreeItem) -> void:
+	var entry: Dictionary = item.get_metadata(0)
+
+	RPCManager.send_message({
+		"command": "remove-from-watch-list",
+		"params": {"address": entry.address, "data_type": entry.data_type}
+	})
+
+	if entry.frozen:
+		RPCManager.send_message({
+			"command": "remove-from-freeze-list",
+			"params": {"address": entry.address}
+		})
+
+	item.free()
+	selected_cheat_table_item = null
+
+
+func _add_cheat_table_row(entry: Dictionary) -> void:
+	var root := cheat_table.get_root()
+	var item := cheat_table.create_item(root)
+	item.set_metadata(0, entry)
+	item.set_text(0, entry.address)
+	item.set_text(1, str(entry.value) if entry.value != null else "?")
+	item.set_text(2, _data_type_name(entry.data_type))
+	item.set_cell_mode(3, TreeItem.CELL_MODE_CHECK)
+	item.set_checked(3, entry.frozen)
+	item.set_editable(3, true)
+
+
+func _update_cheat_table_item(item: TreeItem) -> void:
+	var entry: Dictionary = item.get_metadata(0)
+	item.set_text(1, str(entry.value) if entry.value != null else "?")
+	item.set_checked(3, entry.frozen)
+	if entry.frozen:
+		item.set_custom_color(0, Color.CYAN)
+		item.set_custom_color(1, Color.CYAN)
+	else:
+		item.clear_custom_color(0)
+		item.clear_custom_color(1)
+
+
+func _find_cheat_table_item(address: String) -> TreeItem:
+	var root := cheat_table.get_root()
+	var child := root.get_first_child()
+	while child:
+		var entry: Dictionary = child.get_metadata(0)
+		if entry.address == address:
+			return child
+		child = child.get_next()
+	return null
+
+
+func _data_type_name(dt: int) -> String:
+	match dt:
+		0: return "U8"
+		1: return "U16"
+		2: return "U32"
+		3: return "U64"
+		4: return "FLOAT"
+		5: return "DOUBLE"
+		6: return "STRING"
+		_: return "?"
+
+
+func _update_cheat_table_values(data: Dictionary) -> void:
+	var root := cheat_table.get_root()
+	var child := root.get_first_child()
+	while child:
+		var entry: Dictionary = child.get_metadata(0)
+		if data.has(entry.address):
+			entry.value = data[entry.address]
+			_update_cheat_table_item(child)
+		child = child.get_next()
 
 
 func _on_write_address_dialog_confirmed() -> void:
 	var write_input = int(write_address_dialog.find_child("WriteValue", true, false).text)
-	print("Writing value: %d to address: 0x%x" % [write_input, write_target_address])  # Debug output
+	print("Writing value: %d to address: %s" % [write_input, write_target_address])
 	RPCManager.send_message({
 		"command": "write-value",
 		"params": {
