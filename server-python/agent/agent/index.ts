@@ -1,7 +1,6 @@
 import { log } from "./logger.js";
-import { DataType } from "./types.js";
+import { ScanType, DataType } from "./types.js";
 import {
-  ScanType,
   firstScan,
   nextScan,
   undoScan,

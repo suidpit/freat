@@ -12,6 +12,7 @@ typedef enum {
   GREATER_THAN,
   INCREASED,
   DECREASED,
+  UNKNOWN,
 } ScanType;
 
 typedef enum {
@@ -57,6 +58,9 @@ static GArray * fn_name( \
                     if (value_at_addr > value_to_scan) { \
                         match = TRUE; \
                     } \
+                    break; \
+                case UNKNOWN: \
+                    match = TRUE; \
                     break; \
                 default: \
                     break; \

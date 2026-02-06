@@ -29,6 +29,7 @@ class ScanType(Enum):
     LESS_THAN = 2
     INCREASED = 3
     DECREASED = 4
+    UNKNOWN = 5
 
 
 class Agent(Protocol):

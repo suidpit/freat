@@ -7,3 +7,12 @@ export enum DataType {
   DOUBLE = 5,
   STRING = 6
 }
+
+export enum ScanType {
+  EXACT,
+  LESS_THAN,
+  GREATER_THAN,
+  INCREASED,
+  DECREASED,
+  UNKNOWN,
+}

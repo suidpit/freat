@@ -14,6 +14,7 @@ extends Control
 @onready var scan_progress_bar: ProgressBar = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/ScanProgressBar
 @onready var cheat_table: Tree = $UI/Hub/Table/MarginContainer/VBoxContainer/CheatTable
 @onready var cheat_table_context_menu: PopupMenu = $UI/Hub/CheatTableContextMenu
+@onready var scan_results_label: Label = $UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/AddressListLabel
 
 var connected = false
 var attached = false
@@ -96,12 +97,12 @@ func _refresh_process_list(filter: String) -> void:
 		if not search_process.text or proc.name.containsn(filter):
 			process_list.add_item("%s %s" % [int(proc.pid), proc.name])
 
-func _is_relative_scan_type(id: int) -> bool:
-	return id == 3 or id == 4  # INCREASED or DECREASED
+func _is_valueless_scan_type(id: int) -> bool:
+	return id == 3 or id == 4 or id == 5  # INCREASED, DECREASED, or UNKNOWN
 
 func _on_scan_type_selected(_index: int) -> void:
 	var selected_id = scan_type.get_selected_id()
-	scan_value.editable = not _is_relative_scan_type(selected_id)
+	scan_value.editable = not _is_valueless_scan_type(selected_id)
 
 func populate_scan_results(data: Array) -> void:
 	var root := scan_results_tree.get_root()
@@ -155,6 +156,8 @@ func _on_message(data: Dictionary) -> void:
 			process_list_timer.stop()
 			pick_process.hide()
 			hub.show()
+		"first-scan", "next-scan":
+			scan_results_label.text = "Scan Results (%s)" % _format_count(payload)
 		"current-scan-results":
 			populate_scan_results(payload)
 			if not is_scan:
@@ -182,12 +185,13 @@ func _on_message(data: Dictionary) -> void:
 
 func _on_first_scan_button_pressed() -> void:
 	var selected_scan_type = scan_type.get_selected_id()
-	if _is_relative_scan_type(selected_scan_type):
+	if selected_scan_type == 3 or selected_scan_type == 4:  # INCREASED or DECREASED
 		return
+	var value = 0 if _is_valueless_scan_type(selected_scan_type) else int(scan_value.text)
 	RPCManager.send_message({
 		"command": "first-scan",
 		"params": {
-			"value": int(scan_value.text),
+			"value": value,
 			"data_type": data_type.get_selected_id(),
 			"scan_type": selected_scan_type
 		}
@@ -195,7 +199,7 @@ func _on_first_scan_button_pressed() -> void:
 
 func _on_second_scan_button_pressed() -> void:
 	var selected_scan_type = scan_type.get_selected_id()
-	var value = 0 if _is_relative_scan_type(selected_scan_type) else int(scan_value.text)
+	var value = 0 if _is_valueless_scan_type(selected_scan_type) else int(scan_value.text)
 	RPCManager.send_message({
 		"command": "next-scan",
 		"params": {
@@ -209,6 +213,7 @@ func _on_undo_scan_button_pressed() -> void:
 	RPCManager.send_message({"command": "undo-scan"})
 	is_scan = false
 	_switch_scan_controls(false)
+	scan_results_label.text = "Scan Results"
 
 
 func _on_scan_result_selected() -> void:
@@ -348,6 +353,13 @@ func _find_cheat_table_item(address: String) -> TreeItem:
 		child = child.get_next()
 	return null
 
+
+func _format_count(n: int) -> String:
+	if n >= 1_000_000:
+		return "%.1fM" % (n / 1_000_000.0)
+	elif n >= 1_000:
+		return "%.1fK" % (n / 1_000.0)
+	return str(n)
 
 func _data_type_name(dt: int) -> String:
 	match dt:

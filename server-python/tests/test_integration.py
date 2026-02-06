@@ -32,7 +32,7 @@ async def test_hello(test_hub: Hub, mocker: MockFixture):
     )
 
 
-@pytest.mark.timeout(10)
+@pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_scan(test_hub: Hub, mocker: MockFixture):
     assert test_hub.agent

@@ -1,14 +1,6 @@
 import { log } from "./logger.js";
 import { readValue, writeValue } from "./memory.js";
-import { DataType } from "./types.js";
-
-export enum ScanType {
-  EXACT,
-  LESS_THAN,
-  GREATER_THAN,
-  INCREASED,
-  DECREASED,
-}
+import { ScanType, DataType } from "./types.js";
 
 // C code expects integer enums for ScanSize, so we convert DataType strings to integers
 const onMessageCallback = new NativeCallback(
@@ -362,6 +354,119 @@ export function runScanTest(): boolean {
   }
   if (checkAddrInResults(range.base.add(8))) {
     console.error("Test 11 failed: value 300->350 should NOT be DECREASED");
+    return false;
+  }
+
+  // Test 12: UNKNOWN first scan captures all addresses, then EXACT next scan filters
+  range.base.writeU32(42);
+  range.base.add(4).writeU32(99);
+  firstScan(0, DataType.U32, ScanType.UNKNOWN);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 12 failed: UNKNOWN scan should capture all addresses");
+    return false;
+  }
+  if (!checkAddrInResults(range.base.add(4))) {
+    console.error("Test 12 failed: UNKNOWN scan should capture all addresses (addr+4)");
+    return false;
+  }
+  nextScan(42, ScanType.EXACT);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 12 failed: EXACT next scan should find value 42");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 12 failed: EXACT next scan should NOT match value 99");
+    return false;
+  }
+
+  // Test 13: UNKNOWN first scan + INCREASED next scan
+  range.base.writeU32(100);
+  range.base.add(4).writeU32(200);
+  firstScan(0, DataType.U32, ScanType.UNKNOWN);
+  range.base.writeU32(150);       // 100 -> 150 (increased)
+  range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
+  nextScan(0, ScanType.INCREASED);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 13 failed: value 100->150 should be INCREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 13 failed: value 200->200 should NOT be INCREASED");
+    return false;
+  }
+
+  // Test 14: FLOAT EXACT scan
+  range.base.writeFloat(3.14);
+  range.base.add(4).writeFloat(2.71);
+  range.base.add(8).writeFloat(3.14);
+  firstScan(3.14, DataType.FLOAT, ScanType.EXACT);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 14 failed: float 3.14 should match EXACT");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 14 failed: float 2.71 should NOT match EXACT 3.14");
+    return false;
+  }
+
+  // Test 15: FLOAT LESS_THAN scan
+  range.base.writeFloat(1.5);
+  range.base.add(4).writeFloat(5.5);
+  range.base.add(8).writeFloat(3.0);
+  firstScan(3.0, DataType.FLOAT, ScanType.LESS_THAN);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 15 failed: float 1.5 should be < 3.0");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 15 failed: float 5.5 should NOT be < 3.0");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(8))) {
+    console.error("Test 15 failed: float 3.0 should NOT be < 3.0 (boundary)");
+    return false;
+  }
+
+  // Test 16: FLOAT GREATER_THAN scan
+  firstScan(3.0, DataType.FLOAT, ScanType.GREATER_THAN);
+  if (checkAddrInResults(range.base)) {
+    console.error("Test 16 failed: float 1.5 should NOT be > 3.0");
+    return false;
+  }
+  if (!checkAddrInResults(range.base.add(4))) {
+    console.error("Test 16 failed: float 5.5 should be > 3.0");
+    return false;
+  }
+
+  // Test 17: FLOAT INCREASED next scan
+  range.base.writeFloat(10.0);
+  range.base.add(4).writeFloat(20.0);
+  firstScan(0, DataType.FLOAT, ScanType.GREATER_THAN); // baseline
+  range.base.writeFloat(15.0);       // 10.0 -> 15.0 (increased)
+  range.base.add(4).writeFloat(20.0); // 20.0 -> 20.0 (unchanged)
+  nextScan(0, ScanType.INCREASED);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 17 failed: float 10.0->15.0 should be INCREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 17 failed: float 20.0->20.0 should NOT be INCREASED");
+    return false;
+  }
+
+  // Test 18: FLOAT DECREASED next scan
+  range.base.writeFloat(10.0);
+  range.base.add(4).writeFloat(20.0);
+  firstScan(0, DataType.FLOAT, ScanType.GREATER_THAN); // baseline
+  range.base.writeFloat(5.0);        // 10.0 -> 5.0 (decreased)
+  range.base.add(4).writeFloat(25.0); // 20.0 -> 25.0 (increased)
+  nextScan(0, ScanType.DECREASED);
+  if (!checkAddrInResults(range.base)) {
+    console.error("Test 18 failed: float 10.0->5.0 should be DECREASED");
+    return false;
+  }
+  if (checkAddrInResults(range.base.add(4))) {
+    console.error("Test 18 failed: float 20.0->25.0 should NOT be DECREASED");
     return false;
   }
 
