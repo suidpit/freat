@@ -12,9 +12,12 @@ extends Control
 @onready var search_process: LineEdit = $UI/PickProcess/PanelContainer/MarginContainer/VBoxContainer/SearchProcess
 @onready var write_address_dialog: AcceptDialog = $UI/Hub/WriteAddressDialog
 @onready var scan_progress_bar: ProgressBar = $UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer/ScanProgressBar
-@onready var cheat_table: Tree = $UI/Hub/Table/MarginContainer/VBoxContainer/CheatTable
+@onready var cheat_table: Tree = $UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer/CheatTable
 @onready var cheat_table_context_menu: PopupMenu = $UI/Hub/CheatTableContextMenu
 @onready var scan_results_label: Label = $UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/AddressListLabel
+@onready var watchpoint_log: Tree = $UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer/WatchpointLog
+@onready var watchpoint_detail_dialog: AcceptDialog = $UI/Hub/WatchpointDetailDialog
+@onready var watchpoint_detail_text: RichTextLabel = $UI/Hub/WatchpointDetailDialog/DetailText
 
 var connected = false
 var attached = false
@@ -74,6 +77,18 @@ func _ready() -> void:
 	cheat_table.set_column_title_alignment(2, HORIZONTAL_ALIGNMENT_LEFT)
 	cheat_table.set_column_title_alignment(3, HORIZONTAL_ALIGNMENT_LEFT)
 	cheat_table.create_item()
+
+	watchpoint_log.set_column_title(0, "Type")
+	watchpoint_log.set_column_title(1, "Instruction")
+	watchpoint_log.set_column_title(2, "Address")
+	watchpoint_log.set_column_expand(0, false)
+	watchpoint_log.set_column_expand(1, true)
+	watchpoint_log.set_column_expand(2, true)
+	watchpoint_log.set_column_custom_minimum_width(0, 60)
+	watchpoint_log.set_column_title_alignment(0, HORIZONTAL_ALIGNMENT_LEFT)
+	watchpoint_log.set_column_title_alignment(1, HORIZONTAL_ALIGNMENT_LEFT)
+	watchpoint_log.set_column_title_alignment(2, HORIZONTAL_ALIGNMENT_LEFT)
+	watchpoint_log.create_item()
 
 
 func _process(_delta: float) -> void:
@@ -182,6 +197,8 @@ func _on_message(data: Dictionary) -> void:
 				pick_process.show()
 		"watch":
 			_update_cheat_table_values(payload)
+		"watchpoint-hit":
+			_add_watchpoint_log_entry(payload)
 
 func _on_first_scan_button_pressed() -> void:
 	var selected_scan_type = scan_type.get_selected_id()
@@ -235,7 +252,8 @@ func _on_scan_results_item_activated() -> void:
 		"address": address_str,
 		"data_type": current_data_type,
 		"value": selected_scan_result.value,
-		"frozen": false
+		"frozen": false,
+		"watchpoint": ""
 	}
 
 	RPCManager.send_message({
@@ -251,7 +269,25 @@ func _on_cheat_table_right_click(position: Vector2, mouse_button_index: int) -> 
 		return
 	selected_cheat_table_item = cheat_table.get_selected()
 	if selected_cheat_table_item:
+		_build_cheat_table_context_menu(selected_cheat_table_item)
 		cheat_table_context_menu.popup(Rect2i(get_global_mouse_position(), Vector2i.ZERO))
+
+
+func _build_cheat_table_context_menu(item: TreeItem) -> void:
+	cheat_table_context_menu.clear()
+	cheat_table_context_menu.add_item("Write Value", 0)
+	cheat_table_context_menu.add_item("Remove", 1)
+	cheat_table_context_menu.add_separator()
+	var entry: Dictionary = item.get_metadata(0)
+	var wp: String = entry.get("watchpoint", "")
+	if wp == "r":
+		cheat_table_context_menu.add_item("Stop Watching Reads", 4)
+	else:
+		cheat_table_context_menu.add_item("Watch Reads", 2)
+	if wp == "w":
+		cheat_table_context_menu.add_item("Stop Watching Writes", 5)
+	else:
+		cheat_table_context_menu.add_item("Watch Writes", 3)
 
 
 func _on_context_menu_item_selected(id: int) -> void:
@@ -266,6 +302,32 @@ func _on_context_menu_item_selected(id: int) -> void:
 			write_address_dialog.popup_centered()
 		1:  # Remove
 			_remove_from_cheat_table(selected_cheat_table_item)
+		2:  # Watch Reads
+			RPCManager.send_message({
+				"command": "set-watchpoint",
+				"params": {
+					"address": entry.address,
+					"data_type": entry.data_type,
+					"condition": "r"
+				}
+			})
+			entry["watchpoint"] = "r"
+			_update_cheat_table_item(selected_cheat_table_item)
+		3:  # Watch Writes
+			RPCManager.send_message({
+				"command": "set-watchpoint",
+				"params": {
+					"address": entry.address,
+					"data_type": entry.data_type,
+					"condition": "w"
+				}
+			})
+			entry["watchpoint"] = "w"
+			_update_cheat_table_item(selected_cheat_table_item)
+		4, 5:  # Stop Watching Reads/Writes
+			RPCManager.send_message({"command": "clear-watchpoint"})
+			entry["watchpoint"] = ""
+			_update_cheat_table_item(selected_cheat_table_item)
 
 
 func _on_cheat_table_item_edited() -> void:
@@ -333,11 +395,21 @@ func _add_cheat_table_row(entry: Dictionary) -> void:
 
 func _update_cheat_table_item(item: TreeItem) -> void:
 	var entry: Dictionary = item.get_metadata(0)
+	var wp: String = entry.get("watchpoint", "")
+	if wp == "r":
+		item.set_text(0, "[R] %s" % entry.address)
+	elif wp == "w":
+		item.set_text(0, "[W] %s" % entry.address)
+	else:
+		item.set_text(0, entry.address)
 	item.set_text(1, str(entry.value) if entry.value != null else "?")
 	item.set_checked(3, entry.frozen)
 	if entry.frozen:
 		item.set_custom_color(0, Color.CYAN)
 		item.set_custom_color(1, Color.CYAN)
+	elif wp != "":
+		item.set_custom_color(0, Color.GREEN)
+		item.clear_custom_color(1)
 	else:
 		item.clear_custom_color(0)
 		item.clear_custom_color(1)
@@ -395,3 +467,72 @@ func _on_write_address_dialog_confirmed() -> void:
 			"data_type": data_type.get_selected_id()
 		}
 	})
+
+
+func _clear_watchpoint_state(address: String) -> void:
+	var item := _find_cheat_table_item(address)
+	if item:
+		var entry: Dictionary = item.get_metadata(0)
+		entry["watchpoint"] = ""
+		_update_cheat_table_item(item)
+
+
+func _add_watchpoint_log_entry(payload: Dictionary) -> void:
+	_clear_watchpoint_state(payload.get("address", ""))
+	var root := watchpoint_log.get_root()
+	var item := watchpoint_log.create_item(root)
+	var op: String = payload.get("operation", "?")
+	var pc: String = payload.get("pc", "?")
+	var addr: String = payload.get("address", "?")
+
+	item.set_text(0, op.to_upper())
+	item.set_text(1, pc)
+	item.set_text(2, addr)
+	item.set_metadata(0, payload)
+
+	if op == "write":
+		item.set_custom_color(0, Color.ORANGE)
+	else:
+		item.set_custom_color(0, Color.CORNFLOWER_BLUE)
+
+
+func _on_watchpoint_log_item_activated() -> void:
+	var item := watchpoint_log.get_selected()
+	if not item:
+		return
+
+	var payload: Dictionary = item.get_metadata(0)
+	var bbcode := ""
+
+	# Header
+	var op: String = payload.get("operation", "?")
+	var pc: String = payload.get("pc", "?")
+	var addr: String = payload.get("address", "?")
+	bbcode += "[b]%s[/b] at [b]%s[/b] accessing [b]%s[/b]\n\n" % [op.to_upper(), pc, addr]
+
+	# Disassembly
+	bbcode += "[b]Disassembly:[/b]\n"
+	var disasm: Array = payload.get("disassembly", [])
+	for i in disasm.size():
+		var insn: Dictionary = disasm[i]
+		var line := "  %s  %s %s" % [insn.get("address", "?"), insn.get("mnemonic", "?"), insn.get("opStr", "")]
+		if i == 0:
+			bbcode += "[color=yellow]> %s[/color]\n" % line.strip_edges()
+		else:
+			bbcode += "%s\n" % line
+
+	# Stack trace
+	bbcode += "\n[b]Stack Trace:[/b]\n"
+	var bt: Array = payload.get("backtrace", [])
+	for i in bt.size():
+		bbcode += "  #%d  %s\n" % [i, bt[i]]
+
+	watchpoint_detail_text.text = ""
+	watchpoint_detail_text.append_text(bbcode)
+	watchpoint_detail_dialog.popup_centered()
+
+
+func _on_watchpoint_clear_pressed() -> void:
+	var root := watchpoint_log.get_root()
+	for child in root.get_children():
+		child.free()

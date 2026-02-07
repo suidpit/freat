@@ -1,3 +1,5 @@
+import asyncio
+import ctypes
 import json
 import subprocess
 
@@ -49,3 +51,43 @@ async def test_enumerate_processes(test_hub: Hub, mocker: MockFixture):
     )
     sent_data = mock_websocket.send.await_args[0][0]
     assert any(proc["pid"] == test_proc.pid for proc in json.loads(sent_data)["data"])
+
+
+@pytest.mark.timeout(30)
+@pytest.mark.asyncio
+async def test_watchpoint_write(test_hub: Hub, mocker: MockFixture):
+    assert test_hub.agent
+
+    # the test is performed against the python interpreter (pid 0) so we can use the ctypes
+    val = ctypes.c_uint32(42)
+    addr = hex(ctypes.addressof(val))
+
+    hit_event = asyncio.Event()
+    hit_data = {}
+
+    async def capture_send(message_str):
+        msg = json.loads(message_str)
+        if msg.get("event") == "watchpoint-hit":
+            hit_data.update(msg["data"])
+            hit_event.set()
+
+    mock_client = mocker.AsyncMock()
+    mock_client.send = mocker.AsyncMock(side_effect=capture_send)
+    test_hub.register_client(mock_client)
+
+    # DataType.U32 = 2
+    await test_hub.agent.set_watchpoint(addr, 2, "w")
+
+    # this should trigger the watchpoint
+    val.value = 99
+
+    await asyncio.wait_for(hit_event.wait(), timeout=10)
+
+    assert hit_data["address"] == addr
+    assert hit_data["operation"] == "write"
+    assert "pc" in hit_data
+    assert "backtrace" in hit_data
+    assert "disassembly" in hit_data
+    assert len(hit_data["disassembly"]) > 0
+
+    test_hub.unregister_client(mock_client)

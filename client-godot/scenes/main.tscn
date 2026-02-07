@@ -18,6 +18,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_top = 10
 
 [node name="Hub" type="VBoxContainer" parent="UI"]
 layout_mode = 2
@@ -181,30 +182,34 @@ layout_mode = 2
 value = 0.0
 show_percentage = false
 
-[node name="Table" type="PanelContainer" parent="UI/Hub"]
+[node name="BottomArea" type="HBoxContainer" parent="UI/Hub"]
 custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="MarginContainer" type="MarginContainer" parent="UI/Hub/Table"]
+[node name="Table" type="PanelContainer" parent="UI/Hub/BottomArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/Hub/BottomArea/Table"]
 layout_mode = 2
 theme_override_constants/margin_left = 10
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 10
 
-[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/Table/MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/BottomArea/Table/MarginContainer"]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="UI/Hub/Table/MarginContainer/VBoxContainer"]
+[node name="Label" type="Label" parent="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer"]
 layout_mode = 2
 text = "Cheat Table"
 horizontal_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="UI/Hub/Table/MarginContainer/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer"]
 layout_mode = 2
 
-[node name="CheatTable" type="Tree" parent="UI/Hub/Table/MarginContainer/VBoxContainer"]
+[node name="CheatTable" type="Tree" parent="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 columns = 4
@@ -216,11 +221,6 @@ select_mode = 1
 
 [node name="CheatTableContextMenu" type="PopupMenu" parent="UI/Hub"]
 size = Vector2i(150, 100)
-item_count = 2
-item_0/text = "Write Value"
-item_0/id = 0
-item_1/text = "Remove"
-item_1/id = 1
 
 [node name="WriteAddressDialog" type="AcceptDialog" parent="UI/Hub"]
 oversampling_override = 1.0
@@ -240,6 +240,54 @@ horizontal_alignment = 1
 
 [node name="WriteValue" type="LineEdit" parent="UI/Hub/WriteAddressDialog/VBoxContainer"]
 layout_mode = 2
+
+[node name="WatchpointPanel" type="PanelContainer" parent="UI/Hub/BottomArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/Hub/BottomArea/WatchpointPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/BottomArea/WatchpointPanel/MarginContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Watchpoint Log"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="WatchpointLog" type="Tree" parent="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 3
+column_titles_visible = true
+hide_folding = true
+hide_root = true
+select_mode = 1
+
+[node name="ClearButton" type="Button" parent="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Clear"
+
+[node name="WatchpointDetailDialog" type="AcceptDialog" parent="UI/Hub"]
+title = "Watchpoint Detail"
+size = Vector2i(600, 450)
+
+[node name="DetailText" type="RichTextLabel" parent="UI/Hub/WatchpointDetailDialog"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 592.0
+offset_bottom = 400.0
+bbcode_enabled = true
+scroll_active = true
+selection_enabled = true
 
 [node name="PickProcess" type="PanelContainer" parent="UI"]
 visible = false
@@ -280,7 +328,9 @@ placeholder_text = "Process name..."
 alignment = 1
 
 [connection signal="item_activated" from="UI/Hub/ScanArea/PanelContainer/ScanResults/VBoxContainer/ScanResultsTree" to="." method="_on_scan_results_item_activated"]
-[connection signal="item_edited" from="UI/Hub/Table/MarginContainer/VBoxContainer/CheatTable" to="." method="_on_cheat_table_item_edited"]
-[connection signal="item_mouse_selected" from="UI/Hub/Table/MarginContainer/VBoxContainer/CheatTable" to="." method="_on_cheat_table_right_click"]
+[connection signal="item_edited" from="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer/CheatTable" to="." method="_on_cheat_table_item_edited"]
+[connection signal="item_mouse_selected" from="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer/CheatTable" to="." method="_on_cheat_table_right_click"]
 [connection signal="id_pressed" from="UI/Hub/CheatTableContextMenu" to="." method="_on_context_menu_item_selected"]
 [connection signal="confirmed" from="UI/Hub/WriteAddressDialog" to="." method="_on_write_address_dialog_confirmed"]
+[connection signal="item_activated" from="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer/WatchpointLog" to="." method="_on_watchpoint_log_item_activated"]
+[connection signal="pressed" from="UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer/ClearButton" to="." method="_on_watchpoint_clear_pressed"]

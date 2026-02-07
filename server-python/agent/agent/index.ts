@@ -8,6 +8,7 @@ import {
   runScanTest,
 } from "./scan.js";
 import { readBatch, writeBatch, writeValue } from "./memory.js";
+import { setWatchpoint, clearWatchpoint } from "./watchpoint.js";
 
 rpc.exports = {
   hello: (): string => {
@@ -43,5 +44,11 @@ rpc.exports = {
   },
   writeValue: (address: string, value: any, dataType: DataType): void => {
     return writeValue(ptr(address), value, dataType);
+  },
+  setWatchpoint: (address: string, dataType: DataType, condition: string): void => {
+    return setWatchpoint(address, dataType, condition as "r" | "w");
+  },
+  clearWatchpoint: (): void => {
+    return clearWatchpoint();
   },
 };

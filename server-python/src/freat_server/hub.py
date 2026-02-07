@@ -52,6 +52,10 @@ class Agent(Protocol):
         self, ptr: str, value: Any, data_type: DataType
     ) -> Awaitable[None]: ...
     def run_scan_test(self) -> Awaitable[bool]: ...
+    def set_watchpoint(
+        self, address: str, data_type: int, condition: str
+    ) -> Awaitable[None]: ...
+    def clear_watchpoint(self) -> Awaitable[None]: ...
 
 
 class Hub:
@@ -79,6 +83,7 @@ class Hub:
         self.watch_list: set[tuple[str, str]] = set()
         self.freeze_list: list[tuple[str, Any, str]] = []
         self.polling_task: asyncio.Task | None = None
+        self.active_watchpoint: dict | None = None
         self.agent_js = self._load_agent_script()
         self.loop = asyncio.get_event_loop()
         self.top_results_count = 100
@@ -118,6 +123,12 @@ class Hub:
             if payload.get("type") == "scan-progress":
                 asyncio.run_coroutine_threadsafe(
                     self.broadcast({"event": "scan-progress", "data": payload}),
+                    self.loop,
+                )
+            elif payload.get("type") == "watchpoint-hit":
+                self.active_watchpoint = None
+                asyncio.run_coroutine_threadsafe(
+                    self.broadcast({"event": "watchpoint-hit", "data": payload}),
                     self.loop,
                 )
         else:
@@ -272,6 +283,19 @@ class Hub:
                         response = await self.agent.write_value(
                             params["address"], params["value"], params["data_type"]
                         )
+                    case "set-watchpoint":
+                        await self.agent.set_watchpoint(
+                            params["address"],
+                            params["data_type"],
+                            params["condition"],
+                        )
+                        self.active_watchpoint = {
+                            "address": params["address"],
+                            "condition": params["condition"],
+                        }
+                    case "clear-watchpoint":
+                        await self.agent.clear_watchpoint()
+                        self.active_watchpoint = None
                     case _:
                         print(f"Unknown command: {command}")
         except Exception as e:
