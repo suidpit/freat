@@ -2,6 +2,7 @@ import logging
 import lzma
 import socket
 import subprocess
+import time
 from pathlib import Path
 from urllib.request import urlretrieve
 
@@ -22,9 +23,10 @@ def get_free_port() -> int:
 
 
 class WineTargetProvider:
-    def __init__(self, wine_prefix: str):
+    def __init__(self, wine_prefix: str, wine_binary: str | None = None):
         logger.info(f"Initializing WineTargetProvider with prefix: {wine_prefix}")
         self.wine_prefix = wine_prefix
+        self.wine_binary = wine_binary or "wine"
         self.data_dir = self._get_data_dir()
         self.server_path = (
             self.data_dir / f"frida-server-{frida.__version__}-windows-x86_64.exe"
@@ -34,9 +36,7 @@ class WineTargetProvider:
         self.server_process = None
         self._download_binaries()
         self._start_server()
-        self.remote_target_provider = RemoteTargetProvider(
-            "localhost", self.server_port
-        )
+        self.remote_target_provider = self._connect_with_retry()
         logger.info("WineTargetProvider initialized successfully")
 
     def __del__(self):
@@ -70,10 +70,30 @@ class WineTargetProvider:
         else:
             logger.debug(f"Server already exists at {self.server_path}")
 
+    def _connect_with_retry(
+        self, max_attempts: int = 10, delay: float = 0.5
+    ) -> RemoteTargetProvider:
+        # add_remote_device doesn't verify the connection,
+        # so we poke enumerate_processes to make sure it's alive
+        for attempt in range(max_attempts):
+            try:
+                provider = RemoteTargetProvider("localhost", self.server_port)
+                provider.discover()
+                return provider
+            except Exception:
+                if attempt < max_attempts - 1:
+                    logger.debug(
+                        f"frida-server not ready, retrying ({attempt + 1}/{max_attempts})"
+                    )
+                    time.sleep(delay)
+        raise RuntimeError("frida-server failed to become ready")
+
     def _start_server(self):
         logger.info(f"Starting frida-server on port {self.server_port}")
         self.server_process = subprocess.Popen(
-            f"wine {self.server_path} --listen 127.0.0.1:{self.server_port}".split(" "),
+            f"{self.wine_binary} {self.server_path} --listen 127.0.0.1:{self.server_port}".split(
+                " "
+            ),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             env={"WINEPREFIX": self.wine_prefix},

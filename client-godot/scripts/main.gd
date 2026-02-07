@@ -18,8 +18,16 @@ extends Control
 @onready var watchpoint_log: Tree = $UI/Hub/BottomArea/WatchpointPanel/MarginContainer/VBoxContainer/WatchpointLog
 @onready var watchpoint_detail_dialog: AcceptDialog = $UI/Hub/WatchpointDetailDialog
 @onready var watchpoint_detail_text: RichTextLabel = $UI/Hub/WatchpointDetailDialog/DetailText
+@onready var pick_game: PanelContainer = $UI/PickGame
+@onready var game_list: ItemList = $UI/PickGame/PanelContainer/MarginContainer/VBoxContainer/GameList
+@onready var cheat_table_file_dialog: FileDialog = $UI/Hub/CheatTableFileDialog
 
 var connected = false
+var provider: String = ""
+var game_selected: bool = false
+var stay_on_hub: bool = false
+var game_list_items: Array = []
+var file_dialog_saving: bool = false
 var attached = false
 var is_scan = false
 var process_list_items: Array = []
@@ -48,7 +56,8 @@ func _ready() -> void:
 	add_child(process_list_timer)
 
 	hub.hide()
-	pick_process.show()
+	pick_process.hide()
+	pick_game.hide()
 	RPCManager.connect_to_server("ws://localhost:8765")
 
 	scan_results_tree.set_column_title(0, "Address")
@@ -144,10 +153,8 @@ func _on_process_activated(index: int):
 	RPCManager.send_message({"command": "attach", "params": {"pid": pid}})
 
 func _on_connected() -> void:
-	print("CONNECTED!")
 	connected = true
-	RPCManager.send_message({"command": "list-processes"})
-	process_list_timer.start()
+	RPCManager.send_message({"command": "status"})
 
 func _on_process_list_timer_timeout() -> void:
 	RPCManager.send_message({"command": "list-processes"})
@@ -156,6 +163,19 @@ func _on_disconnected() -> void:
 	print("Disconnected from the WS.")
 	connected = false
 
+func _on_game_activated(index: int) -> void:
+	var app_id = game_list_items[index].app_id
+	RPCManager.send_message({"command": "select-proton-game", "params": {"app_id": app_id}})
+
+func _on_game_refresh_pressed() -> void:
+	RPCManager.send_message({"command": "list-proton-games"})
+
+func _populate_game_list(data: Array) -> void:
+	game_list_items = data
+	game_list.clear()
+	for g in data:
+		game_list.add_item("%s (%s)" % [g.name, g.app_id])
+
 func _on_message(data: Dictionary) -> void:
 	if not data.has("event"):
 		return
@@ -163,6 +183,14 @@ func _on_message(data: Dictionary) -> void:
 	var payload = data["data"]
 
 	match event:
+		"list-proton-games":
+			_populate_game_list(payload)
+		"select-proton-game":
+			game_selected = true
+			pick_game.hide()
+			pick_process.show()
+			RPCManager.send_message({"command": "list-processes"})
+			process_list_timer.start()
 		"list-processes":
 			populate_process_list(payload)
 			_refresh_process_list(search_process.text)
@@ -184,17 +212,33 @@ func _on_message(data: Dictionary) -> void:
 			if payload.current == payload.total:
 				scan_progress_bar.visible = false
 		"status":
-			if payload == "attached":
+			provider = payload.provider
+			if payload.state == "attached":
 				attached = true
+				stay_on_hub = false
 				process_list_timer.stop()
 				hub.show()
 				pick_process.hide()
-			else:
+				pick_game.hide()
+			elif stay_on_hub:
+				pass
+			elif attached:
+				# just detached, keep hub visible so logs are readable
 				attached = false
+				stay_on_hub = true
+			elif provider == "proton" and not game_selected:
+				if not pick_game.visible:
+					hub.hide()
+					pick_process.hide()
+					pick_game.show()
+					RPCManager.send_message({"command": "list-proton-games"})
+			else:
 				if process_list_timer.is_stopped():
+					RPCManager.send_message({"command": "list-processes"})
 					process_list_timer.start()
 				hub.hide()
 				pick_process.show()
+				pick_game.hide()
 		"watch":
 			_update_cheat_table_values(payload)
 		"watchpoint-hit":
@@ -536,3 +580,72 @@ func _on_watchpoint_clear_pressed() -> void:
 	var root := watchpoint_log.get_root()
 	for child in root.get_children():
 		child.free()
+
+
+func _on_save_table_pressed() -> void:
+	file_dialog_saving = true
+	cheat_table_file_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	cheat_table_file_dialog.title = "Save Cheat Table"
+	cheat_table_file_dialog.popup_centered()
+
+func _on_load_table_pressed() -> void:
+	file_dialog_saving = false
+	cheat_table_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	cheat_table_file_dialog.title = "Load Cheat Table"
+	cheat_table_file_dialog.popup_centered()
+
+func _on_cheat_table_file_selected(path: String) -> void:
+	if file_dialog_saving:
+		_save_cheat_table(path)
+	else:
+		_load_cheat_table(path)
+
+func _save_cheat_table(path: String) -> void:
+	var entries: Array = []
+	var root := cheat_table.get_root()
+	var child := root.get_first_child()
+	while child:
+		var entry: Dictionary = child.get_metadata(0)
+		entries.append({
+			"address": entry.address,
+			"data_type": entry.data_type,
+			"value": entry.value,
+			"frozen": entry.frozen,
+		})
+		child = child.get_next()
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(JSON.stringify(entries, "\t"))
+	file.close()
+	print("Cheat table saved to %s" % path)
+
+func _load_cheat_table(path: String) -> void:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if not file:
+		print("Failed to open %s" % path)
+		return
+	var json := JSON.new()
+	if json.parse(file.get_as_text()) != OK:
+		print("Failed to parse cheat table JSON")
+		return
+	var entries: Array = json.get_data()
+	for entry in entries:
+		if _find_cheat_table_item(entry.address):
+			continue
+		var new_entry := {
+			"address": entry.address,
+			"data_type": int(entry.data_type),
+			"value": entry.value,
+			"frozen": entry.frozen,
+			"watchpoint": ""
+		}
+		RPCManager.send_message({
+			"command": "add-to-watch-list",
+			"params": {"address": entry.address, "data_type": int(entry.data_type)}
+		})
+		if entry.frozen:
+			RPCManager.send_message({
+				"command": "add-to-freeze-list",
+				"params": {"address": entry.address, "value": entry.value, "data_type": int(entry.data_type)}
+			})
+		_add_cheat_table_row(new_entry)
+	print("Cheat table loaded from %s (%d entries)" % [path, entries.size()])

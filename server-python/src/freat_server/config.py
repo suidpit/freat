@@ -8,7 +8,7 @@ import platformdirs
 
 @dataclass
 class TargetConfig:
-    provider: Literal["local", "remote", "wine", "usb"] = "local"
+    provider: Literal["local", "remote", "wine", "usb", "proton"] = "local"
     options: dict = field(default_factory=dict)
 
 

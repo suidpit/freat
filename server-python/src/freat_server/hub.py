@@ -9,6 +9,7 @@ import frida
 
 from freat_server.config import TargetConfig
 from freat_server.targets.local import LocalTargetProvider
+from freat_server.targets.proton import ProtonTargetProvider
 from freat_server.targets.remote import RemoteTargetProvider
 from freat_server.targets.wine import WineTargetProvider
 
@@ -67,6 +68,7 @@ class Hub:
     def __init__(self, target_config: TargetConfig):
         self.session = None
         self.agent: Agent | None = None
+        self.provider_name = target_config.provider
         if target_config.provider == "local":
             self.target_provider = LocalTargetProvider()
         elif target_config.provider == "wine":
@@ -78,6 +80,8 @@ class Hub:
                 remote_host=target_config.options["host"],
                 remote_port=target_config.options["port"],
             )
+        elif target_config.provider == "proton":
+            self.target_provider = ProtonTargetProvider()
 
         self.clients = set()
         self.watch_list: set[tuple[str, str]] = set()
@@ -183,7 +187,12 @@ class Hub:
 
         self.session = None
         self.agent = None
-        await self.broadcast({"event": "status", "data": "detached"})
+        await self.broadcast(
+            {
+                "event": "status",
+                "data": {"state": "detached", "provider": self.provider_name},
+            }
+        )
 
     async def _poll_loop(self):
         """
@@ -241,8 +250,18 @@ class Hub:
                 ]
                 to_send = {"event": "list-processes", "data": response}
             elif command == "status":
-                response = "attached" if self.agent else "detached"
+                response = {
+                    "state": "attached" if self.agent else "detached",
+                    "provider": self.provider_name,
+                }
                 to_send = {"event": "status", "data": response}
+            elif command == "list-proton-games":
+                games = self.target_provider.discover_games()
+                response = [{"app_id": g.app_id, "name": g.name} for g in games]
+                to_send = {"event": "list-proton-games", "data": response}
+            elif command == "select-proton-game":
+                self.target_provider.select_game(params["app_id"])
+                to_send = {"event": "select-proton-game", "data": "ok"}
             else:
                 if self.agent is None:
                     raise AssertionError("Agent is not initialized")

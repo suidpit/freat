@@ -26,18 +26,26 @@ export function setWatchpoint(
     clearWatchpointOnThreads();
     watchpointActive = false;
 
-    const bt = Thread.backtrace(details.context, Backtracer.ACCURATE);
+    const pcModule = Process.findModuleByAddress(pc);
+    const pcLabel = pcModule
+      ? `${pcModule.name}+0x${pc.sub(pcModule.base).toString(16)}`
+      : pc.toString();
+
+    let bt = Thread.backtrace(details.context, Backtracer.ACCURATE);
+    if (bt.length === 0) {
+      bt = Thread.backtrace(details.context, Backtracer.FUZZY);
+    }
     const backtrace = bt.map((frame) => {
       const sym = DebugSymbol.fromAddress(frame);
       const hasRealName = sym.name && !sym.name.startsWith("0x");
       if (hasRealName) {
         return `${frame}  ${sym.moduleName}!${sym.name}+0x${frame.sub(sym.address).toString(16)}`;
-      } else if (sym.moduleName) {
-        const mod = Process.findModuleByName(sym.moduleName);
-        if (mod) {
-          return `${frame}  ${sym.moduleName}+0x${frame.sub(mod.base).toString(16)}`;
-        }
-        return `${frame}  ${sym.moduleName}`;
+      }
+      const mod = sym.moduleName
+        ? Process.findModuleByName(sym.moduleName)
+        : Process.findModuleByAddress(frame);
+      if (mod) {
+        return `${frame}  ${mod.name}+0x${frame.sub(mod.base).toString(16)}`;
       }
       return frame.toString();
     });
@@ -62,7 +70,7 @@ export function setWatchpoint(
     send({
       type: "watchpoint-hit",
       address: address,
-      pc: pc.toString(),
+      pc: pcLabel,
       operation: condition === "r" ? "read" : "write",
       backtrace: backtrace,
       disassembly: disassembly,
@@ -71,28 +79,35 @@ export function setWatchpoint(
     return true;
   });
 
-  const threads = Process.enumerateThreads();
-  for (const thread of threads) {
-    try {
-      thread.setHardwareWatchpoint(0, target, size, condition);
-    } catch (e) {
-      log(`Failed to set watchpoint on thread ${thread.id}: ${e}`);
-    }
+  const mainThread = Process.enumerateThreads()[0];
+  try {
+    mainThread.setHardwareWatchpoint(0, target, size, condition);
+  } catch (e) {
+    log(`Failed to set watchpoint on main thread ${mainThread.id}: ${e}`);
+    return;
   }
 
+  watchedThreadId = mainThread.id;
   watchpointActive = true;
-  log(`Watchpoint set on ${threads.length} threads`);
+  log(`Watchpoint set on main thread (tid=${mainThread.id})`);
 }
 
+let watchedThreadId: number | null = null;
+
 function clearWatchpointOnThreads(): void {
+  if (watchedThreadId === null) return;
   const threads = Process.enumerateThreads();
   for (const thread of threads) {
-    try {
-      thread.unsetHardwareWatchpoint(0);
-    } catch {
-      // Thread may have exited or watchpoint wasn't set
+    if (thread.id === watchedThreadId) {
+      try {
+        thread.unsetHardwareWatchpoint(0);
+      } catch {
+        // thread may have exited
+      }
+      break;
     }
   }
+  watchedThreadId = null;
 }
 
 export function clearWatchpoint(): void {
