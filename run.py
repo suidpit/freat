@@ -145,15 +145,12 @@ def cmd_build():
 
     print("\n→ Creating DMG...")
 
-    version = "0.1.0"
-    pyproject = Path(HUB_DIR) / "pyproject.toml"
-    if pyproject.exists():
-        import re
-
-        content = pyproject.read_text()
-        match = re.search(r'version\s*=\s*"([^"]+)"', content)
-        if match:
-            version = match.group(1)
+    result = subprocess.run(
+        ["git", "describe", "--tags", "--abbrev=0"],
+        capture_output=True,
+        text=True,
+    )
+    version = result.stdout.strip().lstrip("v") if result.returncode == 0 else "0.0.0"
 
     dmg_name = f"Freat-v{version}-macOS.dmg"
     dmg_path = DIST_DIR / dmg_name

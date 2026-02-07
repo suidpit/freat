@@ -217,5 +217,6 @@ __marimo__/
 
 .DS_Store
 *_agent.js
+server-python/src/freat_server/_version.py
 
 *.dmg

@@ -1,6 +1,6 @@
 [project]
 name = "freat-server"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Python backend for freat."
 readme = "README.md"
 authors = [
@@ -27,6 +27,13 @@ dev = [
 [project.scripts]
 freat-server = "freat_server.server:main"
 
+[tool.hatch.version]
+source = "vcs"
+raw-options = { root = "../" }
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/freat_server/_version.py"
+
 [build-system]
-requires = ["uv_build>=0.9.5,<0.10.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
