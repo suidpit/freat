@@ -9,6 +9,9 @@ var _client := WebSocketPeer.new()
 var _is_connected := false
 
 func connect_to_server(url: String):
+	_client.set_inbound_buffer_size(4 * 1024 * 1024)
+	_client.set_outbound_buffer_size(4 * 1024 * 1024)
+	_client.set_max_queued_packets(4096)
 	_client.connect_to_url(url)
 
 func _process(_delta: float):

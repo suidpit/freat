@@ -7,7 +7,14 @@ import {
   getScanResults,
   runScanTest,
 } from "./scan.js";
-import { readBatch, writeBatch, writeValue } from "./memory.js";
+import {
+  readBatch,
+  writeBatch,
+  writeValue,
+  addFreeze,
+  removeFreeze,
+  clearFreezeList,
+} from "./memory.js";
 import { setWatchpoint, clearWatchpoint } from "./watchpoint.js";
 
 rpc.exports = {
@@ -27,7 +34,11 @@ rpc.exports = {
   },
   getScanResults: (
     count: number,
-  ): { address: string; value: number | UInt64; previousValue: number | UInt64 }[] => {
+  ): {
+    address: string;
+    value: number | UInt64;
+    previousValue: number | UInt64;
+  }[] => {
     return getScanResults(count);
   },
   undoScan: () => {
@@ -45,7 +56,20 @@ rpc.exports = {
   writeValue: (address: string, value: any, dataType: DataType): void => {
     return writeValue(ptr(address), value, dataType);
   },
-  setWatchpoint: (address: string, dataType: DataType, condition: string): void => {
+  addFreeze: (address: string, value: any, dataType: DataType): void => {
+    return addFreeze(address, value, dataType);
+  },
+  removeFreeze: (address: string): void => {
+    return removeFreeze(address);
+  },
+  clearFreezeList: (): void => {
+    return clearFreezeList();
+  },
+  setWatchpoint: (
+    address: string,
+    dataType: DataType,
+    condition: string,
+  ): void => {
     return setWatchpoint(address, dataType, condition as "r" | "w");
   },
   clearWatchpoint: (): void => {

@@ -179,7 +179,6 @@ layout_mode = 2
 [node name="ScanProgressBar" type="ProgressBar" parent="UI/Hub/ScanArea/PanelContainer2/ScanControls/VBoxContainer"]
 visible = false
 layout_mode = 2
-value = 0.0
 show_percentage = false
 
 [node name="BottomArea" type="HBoxContainer" parent="UI/Hub"]
@@ -297,9 +296,28 @@ offset_left = 8.0
 offset_top = 8.0
 offset_right = 592.0
 offset_bottom = 400.0
+focus_mode = 2
 bbcode_enabled = true
-scroll_active = true
 selection_enabled = true
+
+[node name="FreezeValueDialog" type="AcceptDialog" parent="UI/Hub"]
+oversampling_override = 1.0
+title = "Freeze With Value"
+size = Vector2i(200, 115)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Hub/FreezeValueDialog"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 192.0
+offset_bottom = 66.0
+
+[node name="Label" type="Label" parent="UI/Hub/FreezeValueDialog/VBoxContainer"]
+layout_mode = 2
+text = "Freeze value:"
+horizontal_alignment = 1
+
+[node name="FreezeValue" type="LineEdit" parent="UI/Hub/FreezeValueDialog/VBoxContainer"]
+layout_mode = 2
 
 [node name="CheatTableFileDialog" type="FileDialog" parent="UI/Hub"]
 title = "Cheat Table"
@@ -392,4 +410,6 @@ alignment = 1
 [connection signal="pressed" from="UI/PickGame/PanelContainer/MarginContainer/VBoxContainer/RefreshButton" to="." method="_on_game_refresh_pressed"]
 [connection signal="pressed" from="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer/Header/SaveTableButton" to="." method="_on_save_table_pressed"]
 [connection signal="pressed" from="UI/Hub/BottomArea/Table/MarginContainer/VBoxContainer/Header/LoadTableButton" to="." method="_on_load_table_pressed"]
+[connection signal="canceled" from="UI/Hub/FreezeValueDialog" to="." method="_on_freeze_value_dialog_canceled"]
+[connection signal="confirmed" from="UI/Hub/FreezeValueDialog" to="." method="_on_freeze_value_dialog_confirmed"]
 [connection signal="file_selected" from="UI/Hub/CheatTableFileDialog" to="." method="_on_cheat_table_file_selected"]

@@ -21,6 +21,7 @@ extends Control
 @onready var pick_game: PanelContainer = $UI/PickGame
 @onready var game_list: ItemList = $UI/PickGame/PanelContainer/MarginContainer/VBoxContainer/GameList
 @onready var cheat_table_file_dialog: FileDialog = $UI/Hub/CheatTableFileDialog
+@onready var freeze_value_dialog: AcceptDialog = $UI/Hub/FreezeValueDialog
 
 var connected = false
 var provider: String = ""
@@ -35,6 +36,7 @@ var write_target_address: String = ""
 var process_list_timer: Timer
 var selected_cheat_table_item: TreeItem = null
 var selected_scan_result: Dictionary = {}
+var freeze_pending_item: TreeItem = null
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
@@ -54,6 +56,12 @@ func _ready() -> void:
 	process_list_timer.one_shot = false
 	process_list_timer.timeout.connect(_on_process_list_timer_timeout)
 	add_child(process_list_timer)
+
+	status_timer = Timer.new()
+	status_timer.wait_time = 1.0
+	status_timer.one_shot = false
+	status_timer.timeout.connect(_on_status_timer_timeout)
+	add_child(status_timer)
 
 	hub.hide()
 	pick_process.hide()
@@ -100,11 +108,11 @@ func _ready() -> void:
 	watchpoint_log.create_item()
 
 
+var status_timer: Timer
+
 func _process(_delta: float) -> void:
 	if not connected:
 		RPCManager.connect_to_server("ws://localhost:8765")
-	else:
-		RPCManager.send_message({"command": "status"})
 
 func _switch_scan_controls(status: bool) -> void:
 	second_scan_button.disabled = !status
@@ -154,6 +162,10 @@ func _on_process_activated(index: int):
 
 func _on_connected() -> void:
 	connected = true
+	status_timer.start()
+	RPCManager.send_message({"command": "status"})
+
+func _on_status_timer_timeout() -> void:
 	RPCManager.send_message({"command": "status"})
 
 func _on_process_list_timer_timeout() -> void:
@@ -162,6 +174,7 @@ func _on_process_list_timer_timeout() -> void:
 func _on_disconnected() -> void:
 	print("Disconnected from the WS.")
 	connected = false
+	status_timer.stop()
 
 func _on_game_activated(index: int) -> void:
 	var app_id = game_list_items[index].app_id
@@ -346,6 +359,8 @@ func _on_context_menu_item_selected(id: int) -> void:
 			write_address_dialog.popup_centered()
 		1:  # Remove
 			_remove_from_cheat_table(selected_cheat_table_item)
+		6:  # Freeze with value
+			_show_freeze_dialog(selected_cheat_table_item)
 		2:  # Watch Reads
 			RPCManager.send_message({
 				"command": "set-watchpoint",
@@ -381,29 +396,55 @@ func _on_cheat_table_item_edited() -> void:
 	if column == 3:  # Frozen checkbox column
 		var entry: Dictionary = edited_item.get_metadata(0)
 		var new_state := edited_item.is_checked(3)
-		if new_state != entry.frozen:
-			_toggle_freeze(edited_item)
+		if new_state and not entry.frozen:
+			# Revert checkbox until dialog confirms
+			edited_item.set_checked(3, false)
+			_show_freeze_dialog(edited_item)
+		elif not new_state and entry.frozen:
+			_unfreeze(edited_item)
 
 
-func _toggle_freeze(item: TreeItem) -> void:
+func _show_freeze_dialog(item: TreeItem) -> void:
+	freeze_pending_item = item
 	var entry: Dictionary = item.get_metadata(0)
-	entry.frozen = not entry.frozen
+	var freeze_input: LineEdit = freeze_value_dialog.find_child("FreezeValue", true, false)
+	freeze_input.text = str(entry.value) if entry.value != null else ""
+	freeze_value_dialog.popup_centered()
+	freeze_input.select_all()
+	freeze_input.grab_focus()
 
-	if entry.frozen:
-		RPCManager.send_message({
-			"command": "add-to-freeze-list",
-			"params": {
-				"address": entry.address,
-				"value": entry.value,
-				"data_type": entry.data_type
-			}
-		})
-	else:
-		RPCManager.send_message({
-			"command": "remove-from-freeze-list",
-			"params": {"address": entry.address}
-		})
 
+func _on_freeze_value_dialog_confirmed() -> void:
+	if not freeze_pending_item:
+		return
+	var entry: Dictionary = freeze_pending_item.get_metadata(0)
+	var freeze_input: LineEdit = freeze_value_dialog.find_child("FreezeValue", true, false)
+	var freeze_value = int(freeze_input.text)
+	entry.frozen = true
+	entry.value = freeze_value
+	RPCManager.send_message({
+		"command": "add-to-freeze-list",
+		"params": {
+			"address": entry.address,
+			"value": freeze_value,
+			"data_type": entry.data_type
+		}
+	})
+	_update_cheat_table_item(freeze_pending_item)
+	freeze_pending_item = null
+
+
+func _on_freeze_value_dialog_canceled() -> void:
+	freeze_pending_item = null
+
+
+func _unfreeze(item: TreeItem) -> void:
+	var entry: Dictionary = item.get_metadata(0)
+	entry.frozen = false
+	RPCManager.send_message({
+		"command": "remove-from-freeze-list",
+		"params": {"address": entry.address}
+	})
 	_update_cheat_table_item(item)
 
 

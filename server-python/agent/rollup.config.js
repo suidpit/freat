@@ -10,7 +10,8 @@ import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const cModulePath = path.resolve(__dirname, "native/scanner.c");
+const cScannerPath = path.resolve(__dirname, "native/scanner.c");
+const cFreezerPath = path.resolve(__dirname, "native/freezer.c");
 const outputAgentPath = path.resolve(
   __dirname,
   "../src/freat_server/_agent.js",
@@ -28,8 +29,11 @@ export default {
       preventAssignment: true,
       delimiters: ['"', '"'],
       values: {
-        __C_MODULE_PLACEHOLDER__: JSON.stringify(
-          fs.readFileSync(cModulePath, "utf8"),
+        __SCANNER_C_MODULE_PLACEHOLDER__: JSON.stringify(
+          fs.readFileSync(cScannerPath, "utf8"),
+        ),
+        __FREEZER_C_MODULE_PLACEHOLDER__: JSON.stringify(
+          fs.readFileSync(cFreezerPath, "utf8"),
         ),
       },
     }),

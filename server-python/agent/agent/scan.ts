@@ -18,7 +18,7 @@ let currentScanResults: {
   valuesPtr: NativePointer;
 }[] = [];
 let currentDataType: DataType = DataType.U32;
-const cScannerCode: string = "__C_MODULE_PLACEHOLDER__";
+const cScannerCode: string = "__SCANNER_C_MODULE_PLACEHOLDER__";
 (globalThis as any).cm = new CModule(cScannerCode, {
   onMessage: onMessageCallback,
 });
@@ -114,7 +114,11 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
     console.warn("No previous scan results found");
     return 0;
   }
-  const newResults: { ptr: NativePointer; count: number; valuesPtr: NativePointer }[] = [];
+  const newResults: {
+    ptr: NativePointer;
+    count: number;
+    valuesPtr: NativePointer;
+  }[] = [];
   const totalResultSets = currentScanResults.length;
   for (let i = 0; i < currentScanResults.length; i++) {
     const { ptr, count, valuesPtr } = currentScanResults[i];
@@ -135,7 +139,11 @@ export function nextScan(value: UInt64 | number, scanType: ScanType): number {
       free_results(ptr);
       free_results(valuesPtr);
       if (newCount > 0 && !newResultsPtr.isNull()) {
-        newResults.push({ ptr: newResultsPtr, count: newCount, valuesPtr: newValuesPtr });
+        newResults.push({
+          ptr: newResultsPtr,
+          count: newCount,
+          valuesPtr: newValuesPtr,
+        });
       } else {
         free_results(newResultsPtr);
         free_results(newValuesPtr);
@@ -158,14 +166,21 @@ export function getScanResults(maxResults: number = 100): {
   value: number | UInt64;
   previousValue: number | UInt64;
 }[] {
-  const results: { address: string; value: number | UInt64; previousValue: number | UInt64 }[] = [];
+  const results: {
+    address: string;
+    value: number | UInt64;
+    previousValue: number | UInt64;
+  }[] = [];
   let addedResults = 0;
   const elemSize = dataTypeByteSize(currentDataType);
   for (const { ptr, count, valuesPtr } of currentScanResults) {
     for (let i = 0; i < count; i++) {
       const address = ptr.add(i * Process.pointerSize).readPointer();
       const value = readValue(address, currentDataType);
-      const previousValue = readValue(valuesPtr.add(i * elemSize), currentDataType);
+      const previousValue = readValue(
+        valuesPtr.add(i * elemSize),
+        currentDataType,
+      );
       results.push({
         address: address.toString(),
         value,
@@ -299,7 +314,7 @@ export function runScanTest(): boolean {
   range.base.add(8).writeU32(300);
   firstScan(0, DataType.U32, ScanType.GREATER_THAN); // baseline: captures values 100, 200, 300
   // Now increase some values
-  range.base.writeU32(150);       // 100 -> 150 (increased)
+  range.base.writeU32(150); // 100 -> 150 (increased)
   range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
   range.base.add(8).writeU32(250); // 300 -> 250 (decreased)
   nextScan(0, ScanType.INCREASED);
@@ -321,7 +336,7 @@ export function runScanTest(): boolean {
   range.base.add(4).writeU32(200);
   range.base.add(8).writeU32(300);
   firstScan(0, DataType.U32, ScanType.GREATER_THAN); // baseline
-  range.base.writeU32(50);        // 100 -> 50 (decreased)
+  range.base.writeU32(50); // 100 -> 50 (decreased)
   range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
   range.base.add(8).writeU32(350); // 300 -> 350 (increased)
   nextScan(0, ScanType.DECREASED);
@@ -347,7 +362,9 @@ export function runScanTest(): boolean {
     return false;
   }
   if (!checkAddrInResults(range.base.add(4))) {
-    console.error("Test 12 failed: UNKNOWN scan should capture all addresses (addr+4)");
+    console.error(
+      "Test 12 failed: UNKNOWN scan should capture all addresses (addr+4)",
+    );
     return false;
   }
   nextScan(42, ScanType.EXACT);
@@ -364,7 +381,7 @@ export function runScanTest(): boolean {
   range.base.writeU32(100);
   range.base.add(4).writeU32(200);
   firstScan(0, DataType.U32, ScanType.UNKNOWN);
-  range.base.writeU32(150);       // 100 -> 150 (increased)
+  range.base.writeU32(150); // 100 -> 150 (increased)
   range.base.add(4).writeU32(200); // 200 -> 200 (unchanged)
   nextScan(0, ScanType.INCREASED);
   if (!checkAddrInResults(range.base)) {
@@ -423,7 +440,7 @@ export function runScanTest(): boolean {
   range.base.writeFloat(10.0);
   range.base.add(4).writeFloat(20.0);
   firstScan(0, DataType.FLOAT, ScanType.GREATER_THAN); // baseline
-  range.base.writeFloat(15.0);       // 10.0 -> 15.0 (increased)
+  range.base.writeFloat(15.0); // 10.0 -> 15.0 (increased)
   range.base.add(4).writeFloat(20.0); // 20.0 -> 20.0 (unchanged)
   nextScan(0, ScanType.INCREASED);
   if (!checkAddrInResults(range.base)) {
@@ -439,7 +456,7 @@ export function runScanTest(): boolean {
   range.base.writeFloat(10.0);
   range.base.add(4).writeFloat(20.0);
   firstScan(0, DataType.FLOAT, ScanType.GREATER_THAN); // baseline
-  range.base.writeFloat(5.0);        // 10.0 -> 5.0 (decreased)
+  range.base.writeFloat(5.0); // 10.0 -> 5.0 (decreased)
   range.base.add(4).writeFloat(25.0); // 20.0 -> 25.0 (increased)
   nextScan(0, ScanType.DECREASED);
   if (!checkAddrInResults(range.base)) {

@@ -1,4 +1,81 @@
-import { DataType } from "./types.js";
+import { DataType, dataTypeByteSize } from "./types.js";
+
+// FreezeEntry = { uintptr_t address (8), uint8_t value[8] (8), uint32_t size (4) + padding }
+const FREEZE_ENTRY_SIZE = 24;
+const MAX_FREEZE_ENTRIES = 64;
+
+const freezeEntries = Memory.alloc(FREEZE_ENTRY_SIZE * MAX_FREEZE_ENTRIES);
+const freezeEntryCount = Memory.alloc(4);
+const freezeRunning = Memory.alloc(4);
+const freezeThread = Memory.alloc(Process.pointerSize);
+const freezeMutex = Memory.alloc(16);
+freezeEntryCount.writeInt(0);
+freezeRunning.writeInt(0);
+freezeThread.writePointer(ptr(0));
+freezeMutex.writePointer(ptr(0));
+
+const cFreezerCode: string = "__FREEZER_C_MODULE_PLACEHOLDER__";
+const freezerCm = new CModule(cFreezerCode, {
+  entries: freezeEntries,
+  entry_count: freezeEntryCount,
+  running: freezeRunning,
+  freeze_thread: freezeThread,
+  freeze_mutex: freezeMutex,
+});
+
+const native_freeze_start = new NativeFunction(
+  freezerCm.freeze_start,
+  "void",
+  [],
+);
+const native_freeze_stop = new NativeFunction(
+  freezerCm.freeze_stop,
+  "void",
+  [],
+);
+const native_freeze_add = new NativeFunction(freezerCm.freeze_add, "void", [
+  "pointer", // address
+  "pointer", // value_ptr
+  "uint32", // size
+]);
+const native_freeze_remove = new NativeFunction(
+  freezerCm.freeze_remove,
+  "void",
+  [
+    "pointer", // address
+  ],
+);
+const native_freeze_clear = new NativeFunction(
+  freezerCm.freeze_clear,
+  "void",
+  [],
+);
+
+const freezeValueBuf = Memory.alloc(8);
+let freezeThreadStarted = false;
+
+export function addFreeze(
+  address: string,
+  value: any,
+  dataType: DataType,
+): void {
+  if (!freezeThreadStarted) {
+    native_freeze_start();
+    freezeThreadStarted = true;
+  }
+  const p = ptr(address);
+  const size = dataTypeByteSize(dataType);
+  writeValue(freezeValueBuf, value, dataType);
+  native_freeze_add(p, freezeValueBuf, size);
+}
+
+export function removeFreeze(address: string): void {
+  native_freeze_remove(ptr(address));
+}
+
+export function clearFreezeList(): void {
+  native_freeze_clear();
+}
 
 export function writeValue(
   address: NativePointer,
@@ -51,9 +128,9 @@ export function readValue(
   }
 }
 
-export function readBatch(
-  addresses: [string, DataType][],
-): { [key: string]: any } {
+export function readBatch(addresses: [string, DataType][]): {
+  [key: string]: any;
+} {
   const results: { [key: string]: any } = {};
   for (const [address, dataType] of addresses) {
     try {
@@ -65,9 +142,7 @@ export function readBatch(
   return results;
 }
 
-export function writeBatch(
-  writes: [string, any, DataType][],
-): void {
+export function writeBatch(writes: [string, any, DataType][]): void {
   for (const [address, value, dataType] of writes) {
     try {
       writeValue(ptr(address), value, dataType);

@@ -48,7 +48,11 @@ class Agent(Protocol):
     def read_batch(
         self, addresses: list[tuple[str, str]]
     ) -> Awaitable[dict[str, Any]]: ...
-    def write_batch(self, writes: list[tuple[str, Any, str]]) -> Awaitable[None]: ...
+    def add_freeze(
+        self, address: str, value: Any, data_type: int
+    ) -> Awaitable[None]: ...
+    def remove_freeze(self, address: str) -> Awaitable[None]: ...
+    def clear_freeze_list(self) -> Awaitable[None]: ...
     def write_value(
         self, ptr: str, value: Any, data_type: DataType
     ) -> Awaitable[None]: ...
@@ -85,7 +89,6 @@ class Hub:
 
         self.clients = set()
         self.watch_list: set[tuple[str, str]] = set()
-        self.freeze_list: list[tuple[str, Any, str]] = []
         self.polling_task: asyncio.Task | None = None
         self.active_watchpoint: dict | None = None
         self.agent_js = self._load_agent_script()
@@ -122,7 +125,11 @@ class Hub:
 
     def _on_agent_message(self, message, data):
         """Handles messages sent from the Frida agent via send()."""
-        if message["type"] == "send" and message.get("payload"):
+        if message["type"] == "error":
+            print(f"[Agent ERROR] {message.get('description', '')}")
+            if message.get("stack"):
+                print(f"[Agent STACK] {message['stack']}")
+        elif message["type"] == "send" and message.get("payload"):
             payload = message["payload"]
             if payload.get("type") == "scan-progress":
                 asyncio.run_coroutine_threadsafe(
@@ -182,6 +189,12 @@ class Hub:
             self.polling_task.cancel()
             self.polling_task = None
 
+        if self.agent:
+            try:
+                await self.agent.clear_freeze_list()
+            except Exception:
+                pass
+
         if self.session:
             self.session.detach()
 
@@ -208,9 +221,6 @@ class Hub:
                     watch_job = list(self.watch_list)
                     response = await self.agent.read_batch(watch_job)
                     await self.broadcast({"event": "watch", "data": response})
-
-                if self.freeze_list:
-                    await self.agent.write_batch(self.freeze_list)
 
                 current_scan_top_results = await self.agent.get_scan_results(
                     self.top_results_count
@@ -255,11 +265,15 @@ class Hub:
                     "provider": self.provider_name,
                 }
                 to_send = {"event": "status", "data": response}
-            elif command == "list-proton-games":
+            elif command == "list-proton-games" and isinstance(
+                self.target_provider, ProtonTargetProvider
+            ):
                 games = self.target_provider.discover_games()
                 response = [{"app_id": g.app_id, "name": g.name} for g in games]
                 to_send = {"event": "list-proton-games", "data": response}
-            elif command == "select-proton-game":
+            elif command == "select-proton-game" and isinstance(
+                self.target_provider, ProtonTargetProvider
+            ):
                 self.target_provider.select_game(params["app_id"])
                 to_send = {"event": "select-proton-game", "data": "ok"}
             else:
@@ -289,15 +303,11 @@ class Hub:
                             (params["address"], params["data_type"])
                         )
                     case "add-to-freeze-list":
-                        self.freeze_list.append(
-                            (params["address"], params["value"], params["data_type"])
+                        await self.agent.add_freeze(
+                            params["address"], params["value"], params["data_type"]
                         )
                     case "remove-from-freeze-list":
-                        self.freeze_list = [
-                            (addr, val, dt)
-                            for addr, val, dt in self.freeze_list
-                            if addr != params["address"]
-                        ]
+                        await self.agent.remove_freeze(params["address"])
                     case "write-value":
                         response = await self.agent.write_value(
                             params["address"], params["value"], params["data_type"]
@@ -323,4 +333,5 @@ class Hub:
         finally:
             if to_send:
                 to_send["uuid"] = request_uuid
-                await websocket.send(json.dumps(to_send))
+                msg_str = json.dumps(to_send)
+                await websocket.send(msg_str)
