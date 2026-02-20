@@ -1,7 +1,7 @@
 import { DataType, dataTypeByteSize } from "./types.js";
 
-// FreezeEntry = { uintptr_t address (8), uint8_t value[8] (8), uint32_t size (4) + padding }
-const FREEZE_ENTRY_SIZE = 24;
+// FreezeEntry = { address(8), value(8), last_written(8), size(4), mode(4), data_type(4), pad(4) }
+const FREEZE_ENTRY_SIZE = 48;
 const MAX_FREEZE_ENTRIES = 64;
 
 const freezeEntries = Memory.alloc(FREEZE_ENTRY_SIZE * MAX_FREEZE_ENTRIES);
@@ -15,13 +15,14 @@ freezeThread.writePointer(ptr(0));
 freezeMutex.writePointer(ptr(0));
 
 const cFreezerCode: string = "__FREEZER_C_MODULE_PLACEHOLDER__";
-const freezerCm = new CModule(cFreezerCode, {
+(globalThis as any).freezerCm = new CModule(cFreezerCode, {
   entries: freezeEntries,
   entry_count: freezeEntryCount,
   running: freezeRunning,
   freeze_thread: freezeThread,
   freeze_mutex: freezeMutex,
 });
+const freezerCm = (globalThis as any).freezerCm;
 
 const native_freeze_start = new NativeFunction(
   freezerCm.freeze_start,
@@ -37,6 +38,8 @@ const native_freeze_add = new NativeFunction(freezerCm.freeze_add, "void", [
   "pointer", // address
   "pointer", // value_ptr
   "uint32", // size
+  "uint32", // mode
+  "uint32", // data_type
 ]);
 const native_freeze_remove = new NativeFunction(
   freezerCm.freeze_remove,
@@ -58,6 +61,7 @@ export function addFreeze(
   address: string,
   value: any,
   dataType: DataType,
+  mode: number = 0,
 ): void {
   if (!freezeThreadStarted) {
     native_freeze_start();
@@ -66,7 +70,7 @@ export function addFreeze(
   const p = ptr(address);
   const size = dataTypeByteSize(dataType);
   writeValue(freezeValueBuf, value, dataType);
-  native_freeze_add(p, freezeValueBuf, size);
+  native_freeze_add(p, freezeValueBuf, size, mode, dataType);
 }
 
 export function removeFreeze(address: string): void {

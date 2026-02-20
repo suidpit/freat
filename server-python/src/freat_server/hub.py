@@ -49,7 +49,7 @@ class Agent(Protocol):
         self, addresses: list[tuple[str, str]]
     ) -> Awaitable[dict[str, Any]]: ...
     def add_freeze(
-        self, address: str, value: Any, data_type: int
+        self, address: str, value: Any, data_type: int, mode: int = 0
     ) -> Awaitable[None]: ...
     def remove_freeze(self, address: str) -> Awaitable[None]: ...
     def clear_freeze_list(self) -> Awaitable[None]: ...
@@ -304,7 +304,10 @@ class Hub:
                         )
                     case "add-to-freeze-list":
                         await self.agent.add_freeze(
-                            params["address"], params["value"], params["data_type"]
+                            params["address"],
+                            params["value"],
+                            params["data_type"],
+                            params.get("mode", 0),
                         )
                     case "remove-from-freeze-list":
                         await self.agent.remove_freeze(params["address"])

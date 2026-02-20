@@ -110,6 +110,10 @@ func _ready() -> void:
 
 var status_timer: Timer
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+		get_viewport().set_input_as_handled()
+
 func _process(_delta: float) -> void:
 	if not connected:
 		RPCManager.connect_to_server("ws://localhost:8765")
@@ -310,6 +314,7 @@ func _on_scan_results_item_activated() -> void:
 		"data_type": current_data_type,
 		"value": selected_scan_result.value,
 		"frozen": false,
+		"freeze_mode": 0,
 		"watchpoint": ""
 	}
 
@@ -334,6 +339,8 @@ func _build_cheat_table_context_menu(item: TreeItem) -> void:
 	cheat_table_context_menu.clear()
 	cheat_table_context_menu.add_item("Write Value", 0)
 	cheat_table_context_menu.add_item("Remove", 1)
+	cheat_table_context_menu.add_item("Freeze", 6)
+	cheat_table_context_menu.add_item("Scale", 7)
 	cheat_table_context_menu.add_separator()
 	var entry: Dictionary = item.get_metadata(0)
 	var wp: String = entry.get("watchpoint", "")
@@ -359,8 +366,10 @@ func _on_context_menu_item_selected(id: int) -> void:
 			write_address_dialog.popup_centered()
 		1:  # Remove
 			_remove_from_cheat_table(selected_cheat_table_item)
-		6:  # Freeze with value
-			_show_freeze_dialog(selected_cheat_table_item)
+		6:  # Freeze
+			_show_freeze_dialog(selected_cheat_table_item, 0)
+		7:  # Scale
+			_show_freeze_dialog(selected_cheat_table_item, 1)
 		2:  # Watch Reads
 			RPCManager.send_message({
 				"command": "set-watchpoint",
@@ -399,16 +408,26 @@ func _on_cheat_table_item_edited() -> void:
 		if new_state and not entry.frozen:
 			# Revert checkbox until dialog confirms
 			edited_item.set_checked(3, false)
-			_show_freeze_dialog(edited_item)
+			_show_freeze_dialog(edited_item, 0)
 		elif not new_state and entry.frozen:
 			_unfreeze(edited_item)
 
 
-func _show_freeze_dialog(item: TreeItem) -> void:
+func _show_freeze_dialog(item: TreeItem, mode: int) -> void:
 	freeze_pending_item = item
 	var entry: Dictionary = item.get_metadata(0)
 	var freeze_input: LineEdit = freeze_value_dialog.find_child("FreezeValue", true, false)
-	freeze_input.text = str(entry.value) if entry.value != null else ""
+	var freeze_mode: OptionButton = freeze_value_dialog.find_child("FreezeMode", true, false)
+	var label: Label = freeze_value_dialog.find_child("Label", true, false)
+	freeze_mode.select(mode)
+	if mode == 1:
+		label.text = "Scale factor:"
+		freeze_input.text = "2"
+		freeze_value_dialog.title = "Scale Value"
+	else:
+		label.text = "Freeze value:"
+		freeze_input.text = str(entry.value) if entry.value != null else ""
+		freeze_value_dialog.title = "Freeze With Value"
 	freeze_value_dialog.popup_centered()
 	freeze_input.select_all()
 	freeze_input.grab_focus()
@@ -419,15 +438,20 @@ func _on_freeze_value_dialog_confirmed() -> void:
 		return
 	var entry: Dictionary = freeze_pending_item.get_metadata(0)
 	var freeze_input: LineEdit = freeze_value_dialog.find_child("FreezeValue", true, false)
+	var freeze_mode: OptionButton = freeze_value_dialog.find_child("FreezeMode", true, false)
+	var mode := freeze_mode.get_selected_id()
 	var freeze_value = int(freeze_input.text)
 	entry.frozen = true
-	entry.value = freeze_value
+	entry.freeze_mode = mode
+	if mode == 0:
+		entry.value = freeze_value
 	RPCManager.send_message({
 		"command": "add-to-freeze-list",
 		"params": {
 			"address": entry.address,
 			"value": freeze_value,
-			"data_type": entry.data_type
+			"data_type": entry.data_type,
+			"mode": mode
 		}
 	})
 	_update_cheat_table_item(freeze_pending_item)
@@ -489,7 +513,11 @@ func _update_cheat_table_item(item: TreeItem) -> void:
 		item.set_text(0, entry.address)
 	item.set_text(1, str(entry.value) if entry.value != null else "?")
 	item.set_checked(3, entry.frozen)
-	if entry.frozen:
+	var fm: int = entry.get("freeze_mode", 0)
+	if entry.frozen and fm == 1:
+		item.set_custom_color(0, Color.ORANGE)
+		item.set_custom_color(1, Color.ORANGE)
+	elif entry.frozen:
 		item.set_custom_color(0, Color.CYAN)
 		item.set_custom_color(1, Color.CYAN)
 	elif wp != "":
@@ -652,6 +680,7 @@ func _save_cheat_table(path: String) -> void:
 			"data_type": entry.data_type,
 			"value": entry.value,
 			"frozen": entry.frozen,
+			"freeze_mode": entry.get("freeze_mode", 0),
 		})
 		child = child.get_next()
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -672,11 +701,13 @@ func _load_cheat_table(path: String) -> void:
 	for entry in entries:
 		if _find_cheat_table_item(entry.address):
 			continue
+		var fm := int(entry.get("freeze_mode", 0))
 		var new_entry := {
 			"address": entry.address,
 			"data_type": int(entry.data_type),
 			"value": entry.value,
 			"frozen": entry.frozen,
+			"freeze_mode": fm,
 			"watchpoint": ""
 		}
 		RPCManager.send_message({
@@ -686,7 +717,7 @@ func _load_cheat_table(path: String) -> void:
 		if entry.frozen:
 			RPCManager.send_message({
 				"command": "add-to-freeze-list",
-				"params": {"address": entry.address, "value": entry.value, "data_type": int(entry.data_type)}
+				"params": {"address": entry.address, "value": entry.value, "data_type": int(entry.data_type), "mode": fm}
 			})
 		_add_cheat_table_row(new_entry)
 	print("Cheat table loaded from %s (%d entries)" % [path, entries.size()])

@@ -56,8 +56,13 @@ rpc.exports = {
   writeValue: (address: string, value: any, dataType: DataType): void => {
     return writeValue(ptr(address), value, dataType);
   },
-  addFreeze: (address: string, value: any, dataType: DataType): void => {
-    return addFreeze(address, value, dataType);
+  addFreeze: (
+    address: string,
+    value: any,
+    dataType: DataType,
+    mode: number = 0,
+  ): void => {
+    return addFreeze(address, value, dataType, mode);
   },
   removeFreeze: (address: string): void => {
     return removeFreeze(address);

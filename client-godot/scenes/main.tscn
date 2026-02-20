@@ -311,6 +311,15 @@ offset_top = 8.0
 offset_right = 192.0
 offset_bottom = 66.0
 
+[node name="FreezeMode" type="OptionButton" parent="UI/Hub/FreezeValueDialog/VBoxContainer"]
+layout_mode = 2
+selected = 0
+item_count = 2
+popup/item_0/text = "Freeze"
+popup/item_0/id = 0
+popup/item_1/text = "Scale"
+popup/item_1/id = 1
+
 [node name="Label" type="Label" parent="UI/Hub/FreezeValueDialog/VBoxContainer"]
 layout_mode = 2
 text = "Freeze value:"
