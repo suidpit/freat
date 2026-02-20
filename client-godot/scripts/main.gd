@@ -292,6 +292,8 @@ func _on_undo_scan_button_pressed() -> void:
 	is_scan = false
 	_switch_scan_controls(false)
 	scan_results_label.text = "Scan Results"
+	scan_results_tree.clear()
+	scan_results_tree.create_item()
 
 
 func _on_scan_result_selected() -> void:
