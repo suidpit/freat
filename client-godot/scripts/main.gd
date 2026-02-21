@@ -110,6 +110,8 @@ func _ready() -> void:
 
 var status_timer: Timer
 
+# This prevents the joypad input from being handled by the Freat GUI.
+# Otherwise, prototyping cheats with Freat and the target game running side-to-side would be annoying.
 func _input(event: InputEvent) -> void:
 	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
@@ -341,7 +343,7 @@ func _build_cheat_table_context_menu(item: TreeItem) -> void:
 	cheat_table_context_menu.clear()
 	cheat_table_context_menu.add_item("Write Value", 0)
 	cheat_table_context_menu.add_item("Remove", 1)
-	cheat_table_context_menu.add_item("Freeze", 6)
+	cheat_table_context_menu.add_item("Freeze", 6) # note: this functionality is also exposed in the cheat table TreeItem (as a checkbox)
 	cheat_table_context_menu.add_item("Scale", 7)
 	cheat_table_context_menu.add_separator()
 	var entry: Dictionary = item.get_metadata(0)

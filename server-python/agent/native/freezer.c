@@ -5,18 +5,17 @@
 #define MODE_FREEZE 0
 #define MODE_SCALE  1
 
-// see agent/types.ts
-#define DT_U8     0
-#define DT_U16    1
-#define DT_U32    2
-#define DT_U64    3
-#define DT_FLOAT  4
-#define DT_DOUBLE 5
+#define U8     0
+#define U16    1
+#define U32    2
+#define U64    3
+#define FLOAT  4
+#define DOUBLE 5
 
 typedef struct {
     uintptr_t address;
     guint8 value[8]; // freeze value or scale factor
-    guint8 last_written[8];
+    guint8 last_written[8]; // last written value to prevent no-stop multiplications when scaling
     guint32 size;
     guint32 mode;
     guint32 data_type;
@@ -53,12 +52,12 @@ DEFINE_SCALE_HELPER(scale_f64, gdouble)
 
 static void scale_entry(FreezeEntry *e) {
     switch (e->data_type) {
-    case DT_U8:     scale_i8(e);  break;
-    case DT_U16:    scale_i16(e); break;
-    case DT_U32:    scale_i32(e); break;
-    case DT_U64:    scale_i64(e); break;
-    case DT_FLOAT:  scale_f32(e); break;
-    case DT_DOUBLE: scale_f64(e); break;
+    case U8:     scale_i8(e);  break;
+    case U16:    scale_i16(e); break;
+    case U32:    scale_i32(e); break;
+    case U64:    scale_i64(e); break;
+    case FLOAT:  scale_f32(e); break;
+    case DOUBLE: scale_f64(e); break;
     }
 }
 

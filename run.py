@@ -87,8 +87,17 @@ def cmd_test():
     run_cmd("uv run pytest", cwd=HUB_DIR, wait=True)
 
 
-def cmd_build():
-    """Build release package for distribution."""
+def get_version() -> str:
+    result = subprocess.run(
+        ["git", "describe", "--tags", "--abbrev=0"],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip().lstrip("v") if result.returncode == 0 else "0.0.0"
+
+
+def cmd_build(platforms: set[str] = {"macos", "linux", "windows"}):
+    """Build release package for the specified platforms."""
 
     print("=" * 50)
     print("Building Freat Release Package")
@@ -114,22 +123,6 @@ def cmd_build():
         sys.exit(1)
     print("✓ Agent built successfully")
 
-    print("\n→ Exporting Godot project...")
-    godot_path = find_godot_executable()
-    if not godot_path:
-        print("❌ ERROR: Godot executable not found")
-        print("   Please install Godot 4.4+ or set it in PATH")
-        sys.exit(1)
-
-    app_path = BUILD_DIR / "Freat.app"
-    export_cmd = f'{godot_path} --headless --export-release "macOS" {app_path}'
-    run_cmd(export_cmd, cwd=GUI_DIR, wait=True, shell=True)
-
-    if not app_path.exists():
-        print("❌ ERROR: Godot export failed")
-        sys.exit(1)
-    print("✓ Godot project exported")
-
     print("\n→ Building Python package...")
     run_cmd("uv build", cwd=HUB_DIR, wait=True)
 
@@ -138,45 +131,78 @@ def cmd_build():
     if not wheels:
         print("❌ ERROR: No wheel file found in dist/")
         sys.exit(1)
-
     wheel_file = wheels[0]
     print(f"✓ Python package built: {wheel_file.name}")
-    print(f"   Install separately with: pip install {wheel_file}")
 
-    print("\n→ Creating DMG...")
-
-    result = subprocess.run(
-        ["git", "describe", "--tags", "--abbrev=0"],
-        capture_output=True,
-        text=True,
-    )
-    version = result.stdout.strip().lstrip("v") if result.returncode == 0 else "0.0.0"
-
-    dmg_name = f"Freat-v{version}-macOS.dmg"
-    dmg_path = DIST_DIR / dmg_name
-
-    hdiutil_cmd = f'hdiutil create -volname "Freat" -srcfolder "{app_path}" -ov -format UDZO "{dmg_path}"'
-    run_cmd(hdiutil_cmd, wait=True, shell=True, cleanup=False)
-
-    if not dmg_path.exists():
-        print("❌ ERROR: DMG creation failed")
+    print("\n→ Exporting Godot project...")
+    godot_path = find_godot_executable()
+    if not godot_path:
+        print("❌ ERROR: Godot executable not found")
+        print("   Please install Godot 4.4+ or set it in PATH")
         sys.exit(1)
 
-    print(f"✓ DMG created: {dmg_path}")
+    version = get_version()
+    outputs: list[Path] = []
 
-    dmg_size = dmg_path.stat().st_size / (1024 * 1024)
+    # macOS
+    if "macos" in platforms:
+        app_path = BUILD_DIR / "Freat.app"
+        run_cmd(
+            f'{godot_path} --headless --export-release "macOS" {app_path}',
+            cwd=GUI_DIR, wait=True, shell=True,
+        )
+        if not app_path.exists():
+            print("❌ ERROR: macOS Godot export failed")
+            sys.exit(1)
+        macos_zip = DIST_DIR / f"Freat-v{version}-macOS.zip"
+        shutil.make_archive(str(macos_zip.with_suffix("")), "zip", BUILD_DIR, "Freat.app")
+        outputs.append(macos_zip)
+        print(f"✓ macOS: {macos_zip.name}")
+
+    # Linux
+    if "linux" in platforms:
+        linux_binary = BUILD_DIR / "Freat.x86_64"
+        run_cmd(
+            f'{godot_path} --headless --export-release "Linux" {linux_binary}',
+            cwd=GUI_DIR, wait=True, shell=True,
+        )
+        if not linux_binary.exists():
+            print("❌ ERROR: Linux Godot export failed")
+            sys.exit(1)
+        linux_tar = DIST_DIR / f"Freat-v{version}-Linux.tar.gz"
+        shutil.make_archive(str(linux_tar.with_suffix("").with_suffix("")), "gztar",
+                            BUILD_DIR, "Freat.x86_64")
+        outputs.append(linux_tar)
+        print(f"✓ Linux: {linux_tar.name}")
+
+    # Windows
+    if "windows" in platforms:
+        win_binary = BUILD_DIR / "Freat.exe"
+        run_cmd(
+            f'{godot_path} --headless --export-release "Windows Desktop" {win_binary}',
+            cwd=GUI_DIR, wait=True, shell=True,
+        )
+        if not win_binary.exists():
+            print("❌ ERROR: Windows Godot export failed")
+            sys.exit(1)
+        win_zip = DIST_DIR / f"Freat-v{version}-Windows.zip"
+        shutil.make_archive(str(win_zip.with_suffix("")), "zip", BUILD_DIR, "Freat.exe")
+        outputs.append(win_zip)
+        print(f"✓ Windows: {win_zip.name}")
+
     print()
     print("=" * 50)
     print("✅ Build Complete!")
     print("=" * 50)
     print()
-    print(f"Output: {dmg_path}")
-    print(f"Size: {dmg_size:.1f} MB")
+    for out in outputs:
+        size_mb = out.stat().st_size / (1024 * 1024)
+        print(f"  {out.name} ({size_mb:.1f} MB)")
     print()
     print("📦 To use Freat:")
-    print(f"   1. Install server: pip install {wheel_file}")
-    print("   2. Start server: freat-server")
-    print("   3. Launch GUI from DMG")
+    print(f"   1. Install server: pip install {wheel_file.name}")
+    print("   2. Start server:   freat-server")
+    print("   3. Launch the GUI binary for your platform")
     print()
 
 
@@ -187,7 +213,14 @@ def main():
         "dev", help="Run all components in live-reload development mode"
     )
     subparser.add_parser("test", help="Run the test suite")
-    subparser.add_parser("build", help="Build release package for distribution")
+    build_parser = subparser.add_parser("build", help="Build release package for distribution")
+    build_parser.add_argument(
+        "--platform",
+        nargs="+",
+        choices=["macos", "linux", "windows"],
+        default=["macos", "linux", "windows"],
+        help="Platforms to build (default: all)",
+    )
 
     args = parser.parse_args()
 
@@ -197,7 +230,7 @@ def main():
         case "test":
             cmd_test()
         case "build":
-            cmd_build()
+            cmd_build(set(args.platform))
         case _:
             print("Invalid command")
 
