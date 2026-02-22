@@ -6,6 +6,8 @@
 extern void onMessage(const gchar *message);
 static void log(const gchar * format, ...);
 
+gboolean debug_logging = FALSE;
+
 typedef enum {
   EXACT,
   LESS_THAN,
@@ -258,6 +260,7 @@ void free_results(uintptr_t *results_ptr) {
 }
 
 static void log(const gchar *format, ...) {
+    if (!debug_logging) return;
     gchar *message;
     va_list args;
     va_start(args, format);

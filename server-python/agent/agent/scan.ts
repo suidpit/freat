@@ -2,7 +2,6 @@ import { log } from "./logger.js";
 import { readValue, writeValue } from "./memory.js";
 import { ScanType, DataType, dataTypeByteSize } from "./types.js";
 
-// C code expects integer enums for ScanSize, so we convert DataType strings to integers
 const onMessageCallback = new NativeCallback(
   (messagePtr) => {
     const message = messagePtr!.readUtf8String();
@@ -52,6 +51,10 @@ const free_results = new NativeFunction(cm.free_results, "void", ["pointer"]);
 const outCountPtr = Memory.alloc(Process.pointerSize);
 const outValuesPtrPtr = Memory.alloc(Process.pointerSize);
 const valuePtr = Memory.alloc(8);
+
+export function setDebugLogging(enabled: boolean): void {
+  cm.debug_logging.writeInt(enabled ? 1 : 0);
+}
 
 export function getCount(): number {
   return currentScanResults.reduce((acc, { count }) => acc + count, 0);

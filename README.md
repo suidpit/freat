@@ -6,6 +6,13 @@ In its current state, it supports CheatEngine-like features like memory scanning
 
 If you're interested, please read more about Freat's development and design in the [linked blogpost](https://suidpit.sh/freat-intro).
 
+> DISCLAIMER
+>
+> Freat was developed just for fun and learning purposes.
+> I do not condone the use of this tool to cheat in online multiplayer games.
+> Reverse engineering and hacking to learn and experiment is fun.
+> Ruining the experience of other fellow gamers is lame.
+
 ## Features
 
 - **Memory scanning**: scan the entire address space for values, then refine results with subsequent scans
