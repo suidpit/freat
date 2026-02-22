@@ -13,6 +13,7 @@ typedef enum {
   INCREASED,
   DECREASED,
   UNKNOWN,
+  UNCHANGED,
 } ScanType;
 
 typedef enum {
@@ -180,6 +181,11 @@ static GArray * fn_name( \
                     break; \
                 case DECREASED: \
                     if (value_at_addr < prev_vals[i]) { \
+                        match = TRUE; \
+                    } \
+                    break; \
+                case UNCHANGED: \
+                    if (value_at_addr == prev_vals[i]) { \
                         match = TRUE; \
                     } \
                     break; \

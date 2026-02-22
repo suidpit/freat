@@ -136,7 +136,7 @@ func _refresh_process_list(filter: String) -> void:
 			process_list.add_item("%s %s" % [int(proc.pid), proc.name])
 
 func _is_valueless_scan_type(id: int) -> bool:
-	return id == 3 or id == 4 or id == 5  # INCREASED, DECREASED, or UNKNOWN
+	return id == 3 or id == 4 or id == 5 or id == 6  # INCREASED, DECREASED, UNKNOWN, or UNCHANGED
 
 func _on_scan_type_selected(_index: int) -> void:
 	var selected_id = scan_type.get_selected_id()
@@ -265,7 +265,7 @@ func _on_message(data: Dictionary) -> void:
 
 func _on_first_scan_button_pressed() -> void:
 	var selected_scan_type = scan_type.get_selected_id()
-	if selected_scan_type == 3 or selected_scan_type == 4:  # INCREASED or DECREASED
+	if selected_scan_type == 3 or selected_scan_type == 4 or selected_scan_type == 6:  # INCREASED, DECREASED, or UNCHANGED
 		return
 	var value = 0 if _is_valueless_scan_type(selected_scan_type) else int(scan_value.text)
 	RPCManager.send_message({

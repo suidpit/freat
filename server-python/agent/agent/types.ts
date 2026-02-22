@@ -34,4 +34,5 @@ export enum ScanType {
   INCREASED,
   DECREASED,
   UNKNOWN,
+  UNCHANGED,
 }
