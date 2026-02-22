@@ -35,7 +35,6 @@ var process_list_items: Array = []
 var write_target_address: String = ""
 var process_list_timer: Timer
 var selected_cheat_table_item: TreeItem = null
-var selected_scan_result: Dictionary = {}
 var freeze_pending_item: TreeItem = null
 
 # Called when the node enters the scene tree for the first time.
@@ -49,7 +48,8 @@ func _ready() -> void:
 	undo_scan_button.pressed.connect(_on_undo_scan_button_pressed)
 	search_process.text_changed.connect(_refresh_process_list)
 	scan_type.item_selected.connect(_on_scan_type_selected)
-	scan_results_tree.item_selected.connect(_on_scan_result_selected)
+	scan_results_tree.select_mode = Tree.SELECT_MULTI
+	cheat_table.select_mode = Tree.SELECT_MULTI
 
 	process_list_timer = Timer.new()
 	process_list_timer.wait_time = 2.0
@@ -298,36 +298,35 @@ func _on_undo_scan_button_pressed() -> void:
 	scan_results_tree.create_item()
 
 
-func _on_scan_result_selected() -> void:
-	var item = scan_results_tree.get_selected()
-	if item:
-		selected_scan_result = item.get_metadata(0)
+func _get_selected_items(tree: Tree) -> Array[TreeItem]:
+	var items: Array[TreeItem] = []
+	var item = tree.get_next_selected(null)
+	while item:
+		items.append(item)
+		item = tree.get_next_selected(item)
+	return items
+
 
 func _on_scan_results_item_activated() -> void:
-	if selected_scan_result.is_empty():
-		return
-
-	var address_str: String = selected_scan_result.address
 	var current_data_type := data_type.get_selected_id()
-
-	if _find_cheat_table_item(address_str):
-		return
-
-	var new_entry := {
-		"address": address_str,
-		"data_type": current_data_type,
-		"value": selected_scan_result.value,
-		"frozen": false,
-		"freeze_mode": 0,
-		"watchpoint": ""
-	}
-
-	RPCManager.send_message({
-		"command": "add-to-watch-list",
-		"params": {"address": address_str, "data_type": current_data_type}
-	})
-
-	_add_cheat_table_row(new_entry)
+	for item in _get_selected_items(scan_results_tree):
+		var result: Dictionary = item.get_metadata(0)
+		var address_str: String = result.address
+		if _find_cheat_table_item(address_str):
+			continue
+		var new_entry := {
+			"address": address_str,
+			"data_type": current_data_type,
+			"value": result.value,
+			"frozen": false,
+			"freeze_mode": 0,
+			"watchpoint": ""
+		}
+		RPCManager.send_message({
+			"command": "add-to-watch-list",
+			"params": {"address": address_str, "data_type": current_data_type}
+		})
+		_add_cheat_table_row(new_entry)
 
 
 func _on_cheat_table_right_click(position: Vector2, mouse_button_index: int) -> void:
@@ -343,7 +342,7 @@ func _build_cheat_table_context_menu(item: TreeItem) -> void:
 	cheat_table_context_menu.clear()
 	cheat_table_context_menu.add_item("Write Value", 0)
 	cheat_table_context_menu.add_item("Remove", 1)
-	cheat_table_context_menu.add_item("Freeze", 6) # note: this functionality is also exposed in the cheat table TreeItem (as a checkbox)
+	cheat_table_context_menu.add_item("Freeze with value", 6)
 	cheat_table_context_menu.add_item("Scale", 7)
 	cheat_table_context_menu.add_separator()
 	var entry: Dictionary = item.get_metadata(0)
@@ -368,8 +367,10 @@ func _on_context_menu_item_selected(id: int) -> void:
 		0:  # Write Value
 			write_target_address = entry.address
 			write_address_dialog.popup_centered()
-		1:  # Remove
-			_remove_from_cheat_table(selected_cheat_table_item)
+		1:  # Remove — bulk
+			for item in _get_selected_items(cheat_table):
+				_remove_from_cheat_table(item)
+			selected_cheat_table_item = null
 		6:  # Freeze
 			_show_freeze_dialog(selected_cheat_table_item, 0)
 		7:  # Scale
@@ -402,18 +403,33 @@ func _on_context_menu_item_selected(id: int) -> void:
 			_update_cheat_table_item(selected_cheat_table_item)
 
 
+func _freeze_to_current_value(item: TreeItem) -> void:
+	var entry: Dictionary = item.get_metadata(0)
+	entry.frozen = true
+	entry.freeze_mode = 0
+	RPCManager.send_message({
+		"command": "add-to-freeze-list",
+		"params": {
+			"address": entry.address,
+			"value": entry.value,
+			"data_type": entry.data_type,
+			"mode": 0
+		}
+	})
+	_update_cheat_table_item(item)
+
+
 func _on_cheat_table_item_edited() -> void:
 	var edited_item := cheat_table.get_edited()
 	var column := cheat_table.get_edited_column()
 
 	if column == 3:  # Frozen checkbox column
-		var entry: Dictionary = edited_item.get_metadata(0)
 		var new_state := edited_item.is_checked(3)
-		if new_state and not entry.frozen:
-			# Revert checkbox until dialog confirms
-			edited_item.set_checked(3, false)
-			_show_freeze_dialog(edited_item, 0)
-		elif not new_state and entry.frozen:
+		if new_state:
+			for item in _get_selected_items(cheat_table):
+				if not item.get_metadata(0).frozen:
+					_freeze_to_current_value(item)
+		else:
 			_unfreeze(edited_item)
 
 
