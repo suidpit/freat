@@ -144,20 +144,41 @@ func _on_scan_type_selected(_index: int) -> void:
 
 func populate_scan_results(data: Array) -> void:
 	var root := scan_results_tree.get_root()
-	for child in root.get_children():
-		child.free()
 
+	# Build a map of existing items by address so we can update in-place.
+	var existing: Dictionary = {}
+	var child := root.get_first_child()
+	while child:
+		existing[child.get_text(0)] = child
+		child = child.get_next()
+
+	var addresses_in_data: Dictionary = {}
 	for scan_result in data:
 		var prev_val = scan_result.get("previousValue", scan_result.value)
-		var item := scan_results_tree.create_item(root)
+		var address_str: String = scan_result.address
+		addresses_in_data[address_str] = true
+		var item: TreeItem
+		if existing.has(address_str):
+			item = existing[address_str]
+		else:
+			item = scan_results_tree.create_item(root)
+			item.set_text(0, address_str)
 		item.set_metadata(0, scan_result)
-		item.set_text(0, scan_result.address)
 		item.set_text(1, str(prev_val))
 		item.set_text(2, str(scan_result.value))
 		if scan_result.value != prev_val:
 			item.set_custom_color(0, Color.RED)
 			item.set_custom_color(1, Color.RED)
 			item.set_custom_color(2, Color.RED)
+		else:
+			item.clear_custom_color(0)
+			item.clear_custom_color(1)
+			item.clear_custom_color(2)
+
+	# Remove items no longer in results.
+	for address in existing:
+		if not addresses_in_data.has(address):
+			existing[address].free()
 
 
 func _on_process_activated(index: int):
@@ -307,6 +328,7 @@ func _get_selected_items(tree: Tree) -> Array[TreeItem]:
 	return items
 
 
+
 func _on_scan_results_item_activated() -> void:
 	var current_data_type := data_type.get_selected_id()
 	for item in _get_selected_items(scan_results_tree):
@@ -430,7 +452,9 @@ func _on_cheat_table_item_edited() -> void:
 				if not item.get_metadata(0).frozen:
 					_freeze_to_current_value(item)
 		else:
-			_unfreeze(edited_item)
+			for item in _get_selected_items(cheat_table):
+				if item.get_metadata(0).frozen:
+					_unfreeze(item)
 
 
 func _show_freeze_dialog(item: TreeItem, mode: int) -> void:

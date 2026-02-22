@@ -113,27 +113,6 @@ def cmd_build(platforms: set[str] = {"macos", "linux", "windows"}):
     DIST_DIR.mkdir(parents=True)
     print("✓ Build directories cleaned")
 
-    print("\n→ Building Frida agent...")
-    run_cmd("npm install", cwd=AGENT_DIR, wait=True)
-    run_cmd("npm run build", cwd=AGENT_DIR, wait=True)
-
-    agent_js = Path(HUB_DIR) / "src" / "freat_server" / "_agent.js"
-    if not agent_js.exists():
-        print("❌ ERROR: Agent build failed - _agent.js not found")
-        sys.exit(1)
-    print("✓ Agent built successfully")
-
-    print("\n→ Building Python package...")
-    run_cmd("uv build", cwd=HUB_DIR, wait=True)
-
-    dist_dir = Path(HUB_DIR) / "dist"
-    wheels = list(dist_dir.glob("*.whl"))
-    if not wheels:
-        print("❌ ERROR: No wheel file found in dist/")
-        sys.exit(1)
-    wheel_file = wheels[0]
-    print(f"✓ Python package built: {wheel_file.name}")
-
     print("\n→ Exporting Godot project...")
     godot_path = find_godot_executable()
     if not godot_path:
@@ -198,11 +177,6 @@ def cmd_build(platforms: set[str] = {"macos", "linux", "windows"}):
     for out in outputs:
         size_mb = out.stat().st_size / (1024 * 1024)
         print(f"  {out.name} ({size_mb:.1f} MB)")
-    print()
-    print("📦 To use Freat:")
-    print(f"   1. Install server: pip install {wheel_file.name}")
-    print("   2. Start server:   freat-server")
-    print("   3. Launch the GUI binary for your platform")
     print()
 
 
