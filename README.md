@@ -4,7 +4,7 @@ Freat is a tool that allows you to attach to arbitrary programs (probably, games
 
 In its current state, it supports CheatEngine-like features like memory scanning, freezing and writing.
 
-If you're interested, please read more about Freat's development and design in the [linked blogpost](https://suidpit.sh/freat-intro).
+If you're interested, please read more about Freat's development and design in the [linked blogpost](https://suidpit.sh/posts/freat-intro).
 
 > DISCLAIMER
 >
